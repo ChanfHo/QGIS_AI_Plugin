@@ -10,8 +10,7 @@ from .fetch_data import execute_fetch_task
 from .spatial_process import execute_geoprocessing_task
 from .style_management import set_layer_style
 from .retrieve_style_config import retrieve_style_config
-from .prompts import agent_a_prompt, agent_b_prompt, agent_c_prompt, agent_d_prompt, agent_e_prompt
-from .project_management import execute_project_task
+from .prompts import agent_a_prompt, agent_b_prompt, agent_c_prompt, agent_d_prompt
 from .chat_model import call_qwen_with_prompt
 
 # --- 辅助函数：图层名称与字段提取 (从 QgsMapLayer 对象列表提取名称和字段) ---
@@ -270,8 +269,8 @@ def run_agent_c(user_text: str, layers: List[QgsMapLayer]) -> dict:
         extract_sys_prompt = (
             "你是一个GIS助手。请根据用户输入和可用图层列表，提取用户想要操作的目标图层名称，并推断其高度概括的、标准的泛化地理语义（中文）。\n"
             "重要：为了与标准样式库匹配，请去除具体的行政区划或地名修饰词，提取其核心地理要素类别。\n"
-            "特别注意：如果用户的指令是给图层“添加注记/标记/标签”，请务必在地理语义后加上“注记”。如果不是，严禁添加。\n"
-            "例如：'给湖北省河流配置样式' -> '河流'；'给湖北省河流添加注记' -> '河流注记'；'湖北省省界' -> '省级行政区界线'；'湖北省DEM' -> 'DEM'。\n"
+            "特别注意：如果用户的指令是给图层“添加注记/标记/标签”，请务必在地理语义后加上“注记”。如果不是，**严禁添加**。\n"
+            "例如：'给湖北省河流配置样式' -> '河流'；'给湖北省河流添加注记' -> '河流注记'；'湖北省省界' -> '省级行政区界线'；'湖北省DEM' -> 'DEM' '给湖北省各市行政中心点位配置样式' -> '市级行政中心' '给湖北省各市行政中心点位添加注记' -> '行政中心注记'。\n"
             "请仅返回标准的 JSON 格式，不要包含 Markdown 标记或其他文本：\n"
             "{\"target_layer_name\": \"精确匹配的图层名称\", \"content_inference\": \"泛化的地理语义关键词\"}"
         )
@@ -417,64 +416,14 @@ def run_agent_c(user_text: str, layers: List[QgsMapLayer]) -> dict:
 
 
 # --- 核心执行函数 (Agent D) ---
-def run_agent_d(user_text: str, execute: bool = True) -> Dict[str, Any]:
+def run_agent_d(user_text: str, layers: List[QgsMapLayer]) -> Dict[str, Any]:
     """
-    Agent D: 项目管理
-    Args:
-        execute (bool): 是否立即执行。如果在后台线程调用，建议设为 False。
-    """
-    try:
-        # 1. LLM 思考生成 JSON
-        full_prompt = f"{agent_d_prompt}\n\n用户输入: {user_text}"
-        json_content = call_qwen_with_prompt(full_prompt).strip()
-
-        if "```json" in json_content:
-            json_content = json_content.split("```json")[1].split("```")[0].strip()
-        elif "```" in json_content:
-            json_content = json_content.split("```")[1].split("```")[0].strip()
-
-        project_request = json.loads(json_content)
-
-        # 检查错误
-        if "error_message" in project_request:
-            return {"is_process_complete": False, "possible_problem": project_request["error_message"]}
-
-        source_type = project_request.get("source_type")
-        query_params = project_request.get("query_params", {})
-
-        if not source_type:
-            return {"is_process_complete": False, "possible_problem": "JSON缺少关键参数 (source_type)。"}
-
-        # 2. 如果 execute 为 False，直接返回计划，交给主线程去执行
-        if not execute:
-            return {
-                "is_process_complete": True,  # 标记为逻辑成功，等待执行
-                "need_execution": True,  # 标记需要外部执行
-                "source_type": source_type,
-                "query_params": query_params
-            }
-
-        # 3. 如果允许执行 (仅限主线程调用时)
-        task_result = execute_project_task(source_type, query_params)
-
-        if task_result.startswith("Success"):
-            return {"is_process_complete": True, "tool_result": task_result}
-        else:
-            return {"is_process_complete": False, "possible_problem": task_result.replace("Error: ", "")}
-
-    except Exception as e:
-        return {"is_process_complete": False, "possible_problem": f"Agent D 运行错误: {str(e)}"}
-
-
-# --- 核心执行函数 (Agent E) ---
-def run_agent_e(user_text: str, layers: List[QgsMapLayer]) -> Dict[str, Any]:
-    """
-    Agent E: 视图与布局控制
+    Agent D: 视图与布局控制
     只负责解析任务，不直接执行任务，将任务列表返回给主线程执行。
     """
     try:
         # 1. 调用 LLM
-        full_prompt = f"{agent_e_prompt}\n\n用户输入: {user_text}"
+        full_prompt = f"{agent_d_prompt}\n\n用户输入: {user_text}"
         json_content = call_qwen_with_prompt(full_prompt).strip()
 
         # 2. 解析 JSON
@@ -491,9 +440,9 @@ def run_agent_e(user_text: str, layers: List[QgsMapLayer]) -> Dict[str, Any]:
 
         try:
             requests = json.loads(json_content)
-            QgsMessageLog.logMessage(f"Agent E JSON Output: {json.dumps(requests, ensure_ascii=False)}", tag='AI_AGENT_DEBUG', level=Qgis.Info)
+            QgsMessageLog.logMessage(f"Agent D JSON Output: {json.dumps(requests, ensure_ascii=False)}", tag='AI_AGENT_DEBUG', level=Qgis.Info)
         except json.JSONDecodeError:
-            QgsMessageLog.logMessage(f"Agent E JSON Decode Error: {json_content}", tag='AI_AGENT_DEBUG', level=Qgis.Warning)
+            QgsMessageLog.logMessage(f"Agent D JSON Decode Error: {json_content}", tag='AI_AGENT_DEBUG', level=Qgis.Warning)
             return {"is_process_complete": False, "possible_problem": f"JSON解析失败: {json_content}"}
 
         if isinstance(requests, dict): requests = [requests]
@@ -505,4 +454,4 @@ def run_agent_e(user_text: str, layers: List[QgsMapLayer]) -> Dict[str, Any]:
         }
 
     except Exception as e:
-        return {"is_process_complete": False, "possible_problem": f"Agent E 解析异常: {str(e)}"}
+        return {"is_process_complete": False, "possible_problem": f"Agent D 解析异常: {str(e)}"}

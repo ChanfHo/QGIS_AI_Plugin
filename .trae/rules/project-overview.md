@@ -67,6 +67,10 @@
   UI 与调度核心  
   实现聊天窗口界面，并包含后台线程 `AgentsWorkgroupThread`，用于调度各智能体协作运行。
 
+- **`workflow_graph.py`**
+  LangGraph框架编排文件
+  多智能体协作核心逻辑。  
+
 - **`agents.py`**  
   智能体逻辑实现  
   定义各个 Agent（A/B/C/D/E）的工作流程，包括：

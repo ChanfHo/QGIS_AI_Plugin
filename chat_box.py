@@ -17,16 +17,15 @@ from qgis.utils import iface
 from qgis.core import QgsProject, Qgis
 
 from .chat_model import chat_with_openai, call_qwen_with_prompt
-from .project_management import execute_project_task
 from .layout_management import execute_layout_task
 from .hotword_manager import QGISHotwordManager
 from .workflow_graph import create_workflow_graph
 from .prompts import FINAL_SUMMARY_PROMPT, ERROR_REPORT_PROMPT
 
-INITIAL_MESSAGE = ("你好！我是你的QGIS智能AI助手，你可以向我提出用QGIS进行的任何操作。例如，你可以对我说：\n"
-                   "1.将河流图层的样式设置为蓝色；\n"
-                   "2.统计地铁站500m范围内的餐饮店数量；\n"
-                   "3.绘制一幅湖北省水系图；\n")
+INITIAL_MESSAGE = ("你好！我是你的QGIS智能制图助手，你可以向我提出任何关于QGIS的制图任务。例如，你可以对我说：\n"
+                   "1.绘制一幅湖北省普通地图；\n"
+                   "2.加载武汉市行政区边界数据；\n"
+                   "3.将河流图层的样式设置为蓝色；\n")
 
 os.environ['NO_PROXY'] = 'dashscope.aliyuncs.com'
 
@@ -508,7 +507,6 @@ class AgentsWorkgroupThread(QThread):
     # 下载进度信号: target_name, percent
     download_progress_signal = pyqtSignal(str, int)
 
-    execute_project_signal = pyqtSignal(str, dict)
     # 用于传递布局任务列表的信号
     layout_task_signal = pyqtSignal(list)
     # 停止信号
@@ -519,7 +517,6 @@ class AgentsWorkgroupThread(QThread):
         self.user_text = user_text
         self.layers = layers
         # 用于接收主线程执行结果的变量
-        self.project_op_result = None
         self.layout_op_result = None
         self._is_stopped = False
         self.execution_log = [] # 记录执行日志用于总结
@@ -528,19 +525,6 @@ class AgentsWorkgroupThread(QThread):
         """停止线程任务"""
         self._is_stopped = True
         self.stop_signal.emit()
-
-    # 供 LangGraph Node 调用的执行器方法
-    def execute_project_op(self, source_type, query_params):
-        """执行项目操作（需在主线程运行）"""
-        if self._is_stopped: return "任务已停止"
-        self.project_op_result = None
-        self.execute_project_signal.emit(source_type, query_params)
-        
-        # 阻塞等待结果
-        while self.project_op_result is None:
-            if self._is_stopped: return "任务已停止"
-            self.msleep(50)
-        return self.project_op_result
 
     def emit_download_progress(self, target_name: str, percent: int):
         """发送下载进度信号"""
@@ -760,7 +744,7 @@ class ChatBox(QObject):
         avatar = None
         # 如果是AI，这里可以指定头像路径
         if sender == "ai":
-             avatar = os.path.join(os.path.dirname(__file__), 'icon.png')
+             avatar = os.path.join(os.path.dirname(__file__), 'chat_icon.png')
             
         bubble = ChatBubble(text, sender, avatar_path=avatar, typing_effect=typing_effect)
         self.chat_layout.addWidget(bubble)
@@ -829,7 +813,6 @@ class ChatBox(QObject):
         
         self.agents_workgroup.finished.connect(self.on_thread_finished)
         self.agents_workgroup.refresh_map_canvas_signal.connect(self.refresh_map_canvas)
-        self.agents_workgroup.execute_project_signal.connect(self.handle_project_execution)
         self.agents_workgroup.layout_task_signal.connect(self.handle_layout_tasks)
         self.agents_workgroup.download_progress_signal.connect(self.handle_download_progress)
 
@@ -851,14 +834,6 @@ class ChatBox(QObject):
         """处理子线程发来的下载进度，交由对应的进度组件处理"""
         if self.current_step_widget:
             self.current_step_widget.update_download_progress(target_name, percent)
-
-    def handle_project_execution(self, source_type, params):
-        try:
-            result = execute_project_task(source_type, params)
-        except Exception as e:
-            result = f"Error: 主线程执行异常: {str(e)}"
-        if self.agents_workgroup:
-            self.agents_workgroup.project_op_result = result
 
     def handle_layout_tasks(self, tasks):
         results = []
@@ -949,7 +924,7 @@ class ChatBox(QObject):
 
     def on_recording_stopped(self):
         self.voice_btn.setStyleSheet("background-color: transparent; border-radius: 16px; color: #666666;")
-        self.user_inputBox.setPlaceholderText("给QGIS AI发送消息...")
+        self.user_inputBox.setPlaceholderText("给QGIS AI Mapper发送信息...")
         self.user_inputBox.setEnabled(False)
 
     def on_voice_text_received(self, text):

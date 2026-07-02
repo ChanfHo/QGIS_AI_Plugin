@@ -9,6 +9,7 @@ from qgis.core import (
     QgsStyle, QgsColorRamp, QgsGradientColorRamp,
     QgsClassificationQuantile, QgsClassificationJenks, QgsClassificationEqualInterval,
     QgsPalLayerSettings, QgsTextFormat, QgsTextBufferSettings, QgsVectorLayerSimpleLabeling,
+    QgsRuleBasedLabeling, QgsExpression,
     QgsSingleBandGrayRenderer, QgsSingleBandPseudoColorRenderer,
     QgsPalettedRasterRenderer, QgsHillshadeRenderer, QgsRasterShader,
     QgsColorRampShader, QgsRasterBandStats, QgsContrastEnhancement,
@@ -21,6 +22,8 @@ PEN_STYLES = {
     "dash": Qt.DashLine,
     "dot": Qt.DotLine,
     "dash dot": Qt.DashDotLine,
+    "dash dot dot": Qt.DashDotDotLine,
+    "dash dash dot": Qt.CustomDashLine,
     "no": Qt.NoPen
 }
 
@@ -136,7 +139,8 @@ def configure_symbol_layer(symbol: QgsSymbol, params: Dict[str, Any]):
             if "outline_width" in params:
                 sl.setStrokeWidth(float(params["outline_width"]))
             if "outline_style" in params:
-                sl.setStrokeStyle(PEN_STYLES.get(params["outline_style"], Qt.SolidLine))
+                o_style = params["outline_style"]
+                sl.setStrokeStyle(PEN_STYLES.get(o_style, Qt.SolidLine))
 
         # B. 线 (Line) - SimpleLine
         elif isinstance(symbol, QgsLineSymbol):
@@ -149,7 +153,15 @@ def configure_symbol_layer(symbol: QgsSymbol, params: Dict[str, Any]):
 
             # 线型样式
             if "pen_style" in params:
-                sl.setPenStyle(PEN_STYLES.get(params["pen_style"], Qt.SolidLine))
+                p_style = params["pen_style"]
+                sl.setPenStyle(PEN_STYLES.get(p_style, Qt.SolidLine))
+                if p_style == "dash dash dot" and hasattr(sl, "setCustomDashVector"):
+                    if hasattr(sl, "setUseCustomDashPattern"):
+                        sl.setUseCustomDashPattern(True)
+                    sl.setCustomDashVector([6.0, 2.0, 6.0, 2.0, 1.0, 2.0])
+                elif hasattr(sl, "setUseCustomDashPattern"):
+                    sl.setUseCustomDashPattern(False)
+
             if "cap_style" in params:
                 sl.setPenCapStyle(CAP_STYLES.get(params["cap_style"], Qt.SquareCap))
             if "join_style" in params:
@@ -170,7 +182,14 @@ def configure_symbol_layer(symbol: QgsSymbol, params: Dict[str, Any]):
             if "outline_width" in params:
                 sl.setStrokeWidth(float(params["outline_width"]))
             if "outline_style" in params:
-                sl.setStrokeStyle(PEN_STYLES.get(params["outline_style"], Qt.SolidLine))
+                o_style = params["outline_style"]
+                sl.setStrokeStyle(PEN_STYLES.get(o_style, Qt.SolidLine))
+                if o_style == "dash dash dot" and hasattr(sl, "setCustomDashVector"):
+                    if hasattr(sl, "setUseCustomDashPattern"):
+                        sl.setUseCustomDashPattern(True)
+                    sl.setCustomDashVector([6.0, 2.0, 6.0, 2.0, 1.0, 2.0])
+                elif hasattr(sl, "setUseCustomDashPattern"):
+                    sl.setUseCustomDashPattern(False)
 
 
 # --- 样式模糊修改处理函数 ---
@@ -282,6 +301,21 @@ def create_base_symbol(geometry_type: int, params: Dict[str, Any]) -> QgsSymbol:
 
     if symbol:
         configure_symbol_layer(symbol, params)
+        
+        additional_layers = params.get("additional_layers", [])
+        for add_params in additional_layers:
+            add_sym = None
+            if geometry_type == 0:
+                add_sym = QgsMarkerSymbol.createSimple({})
+            elif geometry_type == 1:
+                add_sym = QgsLineSymbol.createSimple({})
+            elif geometry_type == 2:
+                add_sym = QgsFillSymbol.createSimple({})
+                
+            if add_sym:
+                configure_symbol_layer(add_sym, add_params)
+                if add_sym.symbolLayerCount() > 0:
+                    symbol.appendSymbolLayer(add_sym.symbolLayer(0).clone())
 
     return symbol
 
@@ -510,6 +544,7 @@ def set_layer_style(layer_name: str, full_config: Dict[str, Any]) -> str:
                 cat_config = config.get("categories_config", {})
                 cat_data_list = cat_config.get("categories_data", [])
                 target_attr = cat_config.get("categories_attribute", "color")  # color | size | width
+                color_palette = cat_config.get("color_palette", [])
 
                 categories = []
 
@@ -520,21 +555,26 @@ def set_layer_style(layer_name: str, full_config: Dict[str, Any]) -> str:
                 unique_values = layer.dataProvider().uniqueValues(f_idx)
 
                 # 为每个唯一值创建符号
-                for val in unique_values:
-                    # 1. 创建基础符号
-                    symbol = create_base_symbol(geom_type, base_params)
-
-                    # 2. 查找是否有针对该值的特定配置
+                for i, val in enumerate(unique_values):
+                    # 查找是否有针对该值的特定配置
                     specific_conf = next((item for item in cat_data_list if str(item.get("value")) == str(val)), None)
 
                     if specific_conf and "symbol_params" in specific_conf:
-                        # 如果有特定配置，覆盖基础配置
-                        configure_symbol_layer(symbol, specific_conf["symbol_params"])
+                        # 如果有特定配置，合并参数后创建符号
+                        merged_params = {**base_params, **specific_conf["symbol_params"]}
+                        symbol = create_base_symbol(geom_type, merged_params)
                     else:
-                        # 如果没有特定配置，且属性是颜色，则赋予随机颜色(或使用默认ramp逻辑，这里简化为随机)
+                        # 使用基础参数创建符号
+                        symbol = create_base_symbol(geom_type, base_params)
+
+                        # 如果没有特定配置，且属性是颜色，则赋予随机颜色或使用色板
                         if target_attr == "color":
-                            rand_color = QColor(random.randint(0, 255), random.randint(0, 255), random.randint(0, 255))
-                            symbol.setColor(rand_color)
+                            if color_palette:
+                                hex_color = color_palette[i % len(color_palette)]
+                                symbol.setColor(parse_color(hex_color))
+                            else:
+                                rand_color = QColor(random.randint(0, 255), random.randint(0, 255), random.randint(0, 255))
+                                symbol.setColor(rand_color)
 
                     categories.append(QgsRendererCategory(val, symbol, str(val)))
 

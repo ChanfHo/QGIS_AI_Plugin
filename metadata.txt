@@ -3,9 +3,9 @@
 # This file should be included when you package your plugin.# Mandatory items:
 
 [general]
-name=QGIS AI
+name=QGIS AI Mapper
 qgisMinimumVersion=3.0
-description=QGIS AI Assistant
+description=QGIS AI Mapper Plugin
 
 version=0.1
 author=wuhan university

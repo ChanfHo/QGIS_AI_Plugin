@@ -40,17 +40,26 @@
   - `adcode` (text[]): 水系途径省份代码列表
   - `geom` (geometry): 空间几何数据
 
-6. 表名: `china_dem_index` (各省份DEM存储路径索引表)
+6. 表名: `highway` (高速公路)
+  - `gid` (serial): 主键
+  - `name` (text): 高速公路名称
+  - `code` (text): 高速公路编号
+  - `length_km` (double): 高速公路长度
+  - `province` (text[]): 高速公路途径省份名称列表
+  - `adcode` (text[]): 高速公路途径省份代码列表
+  - `geom` (geometry): 空间几何数据
+
+7. 表名: `china_dem_index` (各省份DEM存储路径索引表)
   - `id` (serial): 主键
   - `province` (text): 省份名称
   - `adcode` (text): 省份代码
   - `dir_path` (text): DEM文件存储路径
 
-7. 表名: `china_admin_center` (全国市县级行政中心点，点状数据)
+8. 表名: `china_admin_center` (全国市县级行政中心点，点状数据)
   - `gid` (serial): 主键
   - `name` (text): 名称
   - `adcode` (text): 行政代码
-  - `level` (text): 行政等级编码：1-市级、2-县区级
+  - `level` (text): 行政等级，分为“直辖市”、“省级行政中心”、“设区市行政中心”、“县（区、市）行政中心”四种，其中“省级行政中心”指的是该省省会城市的行政中心
   - `province` (text): 所属省份名称
   - `city` (text): 所属城市名称
   - `geom` (geometry): 空间几何数据

@@ -10,6 +10,7 @@
 		},
 		"categories_config":{
 			"categories_attribute": "color | size | width",
+			"color_palette": ["#Hex1", "#Hex2"],
 			"categories_data":[
 				{"value":  "分类值1", "symbol_params": {}}
 			]
@@ -55,14 +56,24 @@
 			"angle": 0.0,
 			"line_width": 0.6,
 			"line_color": "#000000",
-			"pen_style": "solid | dash | dot | dash dot",
+			"pen_style": "solid | dash | dot | dash dot | dash dot dot | dash dash dot",
 			"cap_style": "square | round | flat",
 			"join_style": "bevel | miter | round",
 			"fill_color": "#CCCCCC",
 			"fill_style": "solid | no | cross | dense1",
 			"outline_color": "#000000",
 			"outline_width": 0.2,
-			"outline_style": "solid | dash"		
+			"outline_style": "solid | dash | dot | dash dot | dash dot dot | dash dash dot",
+			"additional_layers": [
+				{
+					"marker_type": "simple | svg | font",
+					"name": "circle | square | triangle | star | cross",
+					"size": 1.5,
+					"fill_color": "#FFFFFF",
+					"outline_color": "#000000",
+					"outline_width": 0.2
+				}
+			]
 		}
 	}
 }

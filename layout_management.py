@@ -5,11 +5,101 @@ from qgis.core import (
     QgsProject, QgsPrintLayout, QgsLayoutItemMap, QgsLayoutItemLegend,
     QgsLayoutItemScaleBar, QgsLayoutItemLabel, QgsLayoutPoint,
     QgsLayoutSize, QgsUnitTypes, QgsLayoutItemPage, QgsLayoutExporter,
-    QgsLayoutItemPicture, QgsApplication, QgsMessageLog, Qgis, QgsLayoutItem
+    QgsLayoutItemPicture, QgsApplication, QgsMessageLog, Qgis, QgsLayoutItem,
+    QgsMapLayerLegendUtils
 )
 from qgis.PyQt.QtCore import QSettings, Qt
 from qgis.PyQt.QtGui import QFont
-from qgis.PyQt.QtWidgets import QFileDialog
+from qgis.PyQt.QtWidgets import QFileDialog, QDialog, QVBoxLayout, QTreeWidget, QTreeWidgetItem, QPushButton, QHBoxLayout
+
+class LegendSelectionDialog(QDialog):
+    def __init__(self, legend_model, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("选择要显示的图例项")
+        self.resize(400, 500)
+        self.legend_model = legend_model
+        
+        layout = QVBoxLayout(self)
+        
+        self.tree = QTreeWidget()
+        self.tree.setHeaderHidden(True)
+        layout.addWidget(self.tree)
+        
+        btn_layout = QHBoxLayout()
+        self.btn_ok = QPushButton("确定")
+        self.btn_ok.clicked.connect(self.accept)
+        btn_layout.addStretch()
+        btn_layout.addWidget(self.btn_ok)
+        layout.addLayout(btn_layout)
+        
+        self._populate_tree()
+        self.tree.itemChanged.connect(self.on_item_changed)
+
+    def _populate_tree(self):
+        root_group = self.legend_model.rootGroup()
+        for layer_node in root_group.findLayers():
+            layer = layer_node.layer()
+            if not layer:
+                continue
+                
+            layer_item = QTreeWidgetItem(self.tree)
+            layer_item.setText(0, layer.name())
+            layer_item.setFlags(layer_item.flags() | Qt.ItemIsUserCheckable)
+            layer_item.setCheckState(0, Qt.Checked)
+            layer_item.setData(0, Qt.UserRole, layer_node)
+            
+            legend_nodes = self.legend_model.layerLegendNodes(layer_node)
+            for i, node in enumerate(legend_nodes):
+                node_item = QTreeWidgetItem(layer_item)
+                val = node.data(Qt.DisplayRole)
+                text = str(val.value()) if hasattr(val, 'value') else str(val)
+                node_item.setText(0, text)
+                node_item.setFlags(node_item.flags() | Qt.ItemIsUserCheckable)
+                node_item.setCheckState(0, Qt.Checked)
+                node_item.setData(0, Qt.UserRole, i)
+                
+        self.tree.expandAll()
+
+    def on_item_changed(self, item, column):
+        self.tree.blockSignals(True)
+        if item.parent() is None:
+            state = item.checkState(0)
+            for i in range(item.childCount()):
+                item.child(i).setCheckState(0, state)
+        else:
+            parent = item.parent()
+            any_checked = False
+            for i in range(parent.childCount()):
+                if parent.child(i).checkState(0) == Qt.Checked:
+                    any_checked = True
+                    break
+            parent.setCheckState(0, Qt.Checked if any_checked else Qt.Unchecked)
+        self.tree.blockSignals(False)
+
+    def get_selections(self):
+        removed_layers = []
+        layer_visibility = {}
+        
+        for i in range(self.tree.topLevelItemCount()):
+            layer_item = self.tree.topLevelItem(i)
+            layer_node_data = layer_item.data(0, Qt.UserRole)
+            layer_node = layer_node_data.value() if hasattr(layer_node_data, 'value') else layer_node_data
+            
+            if layer_item.checkState(0) == Qt.Unchecked:
+                removed_layers.append(layer_node)
+            else:
+                visible_indices = []
+                for j in range(layer_item.childCount()):
+                    node_item = layer_item.child(j)
+                    if node_item.checkState(0) == Qt.Checked:
+                        idx = node_item.data(0, Qt.UserRole)
+                        idx_val = int(idx.value()) if hasattr(idx, 'value') else int(idx)
+                        visible_indices.append(idx_val)
+                
+                if len(visible_indices) < layer_item.childCount():
+                    layer_visibility[layer_node] = visible_indices
+                    
+        return removed_layers, layer_visibility
 
 
 def get_target_layout(project: QgsProject, layout_name: str = None) -> QgsPrintLayout:
@@ -44,14 +134,7 @@ def execute_layout_task(params: Dict[str, Any]) -> str:
 
     try:
         # --- 1. 视图控制 ---
-        if action_type == "set_scale":
-            scale = float(params.get("scale_value", 10000))
-            if scale <= 0: scale = 10000
-            canvas.zoomScale(int(scale))
-            canvas.refresh()
-            return f"已将比例尺设置为 1:{int(scale)}"
-
-        elif action_type == "zoom_layer":
+        if action_type == "zoom_layer":
             layer_name = params.get("layer_name")
             layers = project.mapLayersByName(layer_name)
             if not layers: return f"Error: 图层 '{layer_name}' 不存在"
@@ -68,6 +151,7 @@ def execute_layout_task(params: Dict[str, Any]) -> str:
         elif action_type == "create_print_layout":
             title = params.get("title", "AI自动布局")
             page_size_str = params.get("page_size", "A4").upper()
+            orientation_str = params.get("orientation", "横向")
             layout_manager = project.layoutManager()
 
             existing_layout = layout_manager.layoutByName(title)
@@ -85,14 +169,20 @@ def execute_layout_task(params: Dict[str, Any]) -> str:
                 page_size_str = "A4"
             page_width, page_height = valid_sizes[page_size_str]
 
+            if orientation_str == "竖向":
+                page_width, page_height = page_height, page_width
+                page_orientation = QgsLayoutItemPage.Orientation.Portrait
+            else:
+                page_orientation = QgsLayoutItemPage.Orientation.Landscape
+
             pc = layout.pageCollection()
             page = pc.page(0)
-            page.setPageSize(page_size_str, QgsLayoutItemPage.Orientation.Landscape)
+            page.setPageSize(page_size_str, page_orientation)
 
             # 标题
             title_item = QgsLayoutItemLabel(layout)
             title_item.setText(title)
-            title_font = QFont("SimHei", 24, QFont.Bold)
+            title_font = QFont("SimHei", 28, QFont.Bold)
             title_item.setFont(title_font)
             title_item.setHAlign(Qt.AlignHCenter)
             title_item.setVAlign(Qt.AlignVCenter)
@@ -110,7 +200,7 @@ def execute_layout_task(params: Dict[str, Any]) -> str:
             # 缩放到图层范围，并稍微缩小比例（放大地图）使其更加饱满
             map_item.zoomToExtent(canvas.extent())
             current_scale = map_item.scale()
-            map_item.setScale(current_scale * 1.2)
+            map_item.setScale(current_scale)
             
             map_item.setFrameEnabled(True)
             layout.addLayoutItem(map_item)
@@ -119,7 +209,7 @@ def execute_layout_task(params: Dict[str, Any]) -> str:
             return f"已创建基础布局 '{title}' (纸张: {page_size_str})"
 
         # --- 3. 组件添加与导出 ---
-        elif action_type in ["add_legend", "add_scale_bar", "add_north_arrow", "add_map", "export_layout_pdf", "set_title"]:
+        elif action_type in ["add_legend", "add_scale_bar", "add_north_arrow", "add_map", "export_layout_png", "set_title"]:
             layout = get_target_layout(project, params.get("layout_name"))
             if not layout: 
                 return "Error: 没有找到任何可用布局。"
@@ -142,7 +232,7 @@ def execute_layout_task(params: Dict[str, Any]) -> str:
                 page_width = page.pageSize().width()
                 title_item = QgsLayoutItemLabel(layout)
                 title_item.setText(new_title)
-                title_font = QFont("SimHei", 24, QFont.Bold)
+                title_font = QFont("SimHei", 28, QFont.Bold)
                 title_item.setFont(title_font)
                 title_item.setHAlign(Qt.AlignHCenter)
                 title_item.setVAlign(Qt.AlignVCenter)
@@ -151,25 +241,25 @@ def execute_layout_task(params: Dict[str, Any]) -> str:
                 layout.addLayoutItem(title_item)
                 return f"已将布局标题设置为 '{new_title}'"
 
-            # ---  导出 PDF ---
-            if action_type == "export_layout_pdf":
+            # ---  导出 PNG ---
+            if action_type == "export_layout_png":
                 # 弹出文件保存对话框 (在主线程中这是安全的)
                 # 参数: 父窗口, 标题, 默认文件名, 文件过滤器
                 file_path, _ = QFileDialog.getSaveFileName(
                     None,
-                    "导出布局为PDF",
-                    f"{layout_name}.pdf",
-                    "PDF Files (*.pdf)"
+                    "导出布局为PNG",
+                    f"{layout_name}.png",
+                    "PNG Files (*.png)"
                 )
 
                 if file_path:
                     exporter = QgsLayoutExporter(layout)
-                    settings = QgsLayoutExporter.PdfExportSettings()
+                    settings = QgsLayoutExporter.ImageExportSettings()
                     # 导出
-                    result = exporter.exportToPdf(file_path, settings)
+                    result = exporter.exportToImage(file_path, settings)
 
                     if result == QgsLayoutExporter.Success:
-                        return f"成功导出 PDF 至: {file_path}"
+                        return f"成功导出 PNG 至: {file_path}"
                     else:
                         return f"Error: 导出失败，错误代码 {result}"
                 else:
@@ -204,7 +294,30 @@ def execute_layout_task(params: Dict[str, Any]) -> str:
                 legend = QgsLayoutItemLegend(layout)
                 if map_item: legend.setLinkedMap(map_item)
                 legend.setTitle("图例")
+                
+                # 默认设为True，获取所有图层
                 legend.setAutoUpdateModel(True)
+                
+                # 关闭自动更新，允许我们自定义过滤
+                legend.setAutoUpdateModel(False)
+                
+                # 弹出选择对话框，过滤不需要的图例项
+                dialog = LegendSelectionDialog(legend.model(), iface.mainWindow())
+                if dialog.exec_() == QDialog.Accepted:
+                    removed_layers, layer_visibility = dialog.get_selections()
+                    
+                    root_group = legend.model().rootGroup()
+                    # 删除未选中的图层
+                    for node in removed_layers:
+                        root_group.removeChildNode(node)
+                        
+                    # 设置图层内部分类/分级样式的可见性
+                    for node, visible_indices in layer_visibility.items():
+                        QgsMapLayerLegendUtils.setLegendNodeOrder(node, visible_indices)
+                        legend.model().refreshLayerLegend(node)
+                else:
+                    return "已取消添加图例操作"
+                
                 layout.addLayoutItem(legend)
                 
                 # 强制重新计算以获取正确的宽高
@@ -240,14 +353,14 @@ def execute_layout_task(params: Dict[str, Any]) -> str:
                 scalebar.setUnitLabel("km")
                 
                 # 分段设置
-                scalebar.setNumberOfSegments(4)
+                scalebar.setNumberOfSegments(3)
                 scalebar.setNumberOfSegmentsLeft(0)
                 
                 # 动态与现有地图适配: 设置分段大小模式为 FitWidth (1)，随地图比例动态调整
                 try:
                     scalebar.setSegmentSizeMode(1)
-                    scalebar.setMinimumBarWidth(30)
-                    scalebar.setMaximumBarWidth(100)
+                    scalebar.setMinimumBarWidth(15)
+                    scalebar.setMaximumBarWidth(50)
                 except Exception:
                     pass
                 

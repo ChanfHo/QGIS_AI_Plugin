@@ -11,7 +11,7 @@
    </rect>
   </property>
   <property name="windowTitle">
-   <string>QGIS AI Assistant</string>
+   <string>QGIS AI Mapper</string>
   </property>
   <property name="styleSheet">
    <string notr="true">
@@ -205,7 +205,7 @@
              </string>
             </property>
             <property name="placeholderText">
-             <string>给QGIS AI发送消息...</string>
+             <string>Message QGIS AI Mapper...</string>
             </property>
            </widget>
           </item>

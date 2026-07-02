@@ -7,6 +7,7 @@ API_KEY = "sk-a2cddd46f8924031b2888c97c73c6e43"
 EMBEDDING_URL = "https://dashscope.aliyuncs.com/api/v1/services/embeddings/text-embedding/text-embedding"
 EMBEDDING_MODEL_NAME = "text-embedding-v4"
 
+
 def get_embedding(text):
     """
     Generates embedding for a single text using Qwen text-embedding-v4.
@@ -15,12 +16,12 @@ def get_embedding(text):
         return None
 
     print(f"Generating embedding for: '{text}'...")
-    
+
     headers = {
         "Authorization": f"Bearer {API_KEY}",
         "Content-Type": "application/json"
     }
-    
+
     payload = {
         "model": EMBEDDING_MODEL_NAME,
         "input": {
@@ -30,23 +31,24 @@ def get_embedding(text):
             "text_type": "document"
         }
     }
-    
+
     try:
         response = requests.post(EMBEDDING_URL, headers=headers, json=payload)
         response.raise_for_status()
         result = response.json()
-        
+
         if "output" in result and "embeddings" in result["output"] and len(result["output"]["embeddings"]) > 0:
             return result["output"]["embeddings"][0]["embedding"]
         else:
             print(f"Unexpected embedding response format: {result}")
             return None
-            
+
     except Exception as e:
         print(f"Embedding API Request Failed: {e}")
         if 'response' in locals():
             print(response.text)
         return None
+
 
 def add_style_to_library():
     """
@@ -59,43 +61,36 @@ def add_style_to_library():
     # 手动在此处修改你要添加的样式配置
     # =========================================================================
     new_style_entry = {
-        "name": "湖泊注记",  # 样式名称
-        "geometry_type": "polygon", # 适用的几何类型 (point | line | polygon)
-        "keywords": [               # 检索关键词
-            "湖泊注记",
-            "湖泊",
-            "水库"
-            "线状水系",
-            "文字",
-            "标签"
+        "name": "市级行政区划注记",
+        "geometry_type": "polygon",
+        "keywords": [
+            "行政区划",
+            "市级",
+            "设区市",
+            "界线",
+            "标注"
         ],
         "style_config": {
-            "layer_name_input": "湖泊注记",
+            "layer_name_input": "市级行政区划注记",
             "style_type": "annotation",
             "style_config": {
-                "field_intend": [
-                    "Name",
-                    "湖泊名称",
-                    "Lake_Name",
-                    "Canal_Name",
-                    "Reservoir_Name"
-                ],
+                "field_intend": ["city_name", "city", "name"],
                 "edit_style_config": {},
                 "categories_config": {},
                 "graduated_config": {},
                 "annotation_config": {
                     "font_family": "Microsoft YaHei",
-                    "font_size": 10.0,
-                    "font_color": "#00FFFF",
+                    "font_size": 11.5,
+                    "font_color": "#000000",
                     "is_bold": True,
-                    "is_italic": True,
+                    "is_italic": False,
                     "draw_buffer": False,
                     "buffer_size": 1.0,
                     "buffer_color": "#FFFFFF",
-                    "mode": "over_line",
+                    "mode": "horizontal",
                     "offset_xy": [
-                        0.0,
-                        0.0
+                        5.0,
+                        5.0
                     ]
                 },
                 "raster_config": {},
@@ -149,6 +144,7 @@ def add_style_to_library():
         print(f"Total entries now: {len(existing_library)}")
     except Exception as e:
         print(f"Error saving updated library: {e}")
+
 
 if __name__ == "__main__":
     add_style_to_library()
