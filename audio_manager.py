@@ -1,3 +1,4 @@
+from .model_config import ASR_MODEL
 import os
 import threading
 from PyQt5.QtCore import QObject, pyqtSignal, QIODevice
@@ -68,7 +69,7 @@ class AudioManager(QObject):
 
         # 1. 初始化在线识别对象
         self.recognition = Recognition(
-            model='fun-asr-realtime',
+            model=ASR_MODEL,
             format='pcm',  # 直接发送原始流
             sample_rate=16000,
             callback=RealTimeCallback(self),

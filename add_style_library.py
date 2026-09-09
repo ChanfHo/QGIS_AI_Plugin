@@ -1,11 +1,10 @@
+from .model_config import API_KEY, EMBEDDING_URL, EMBEDDING_MODEL
 import os
 import json
 import requests
 
 # Configuration
-API_KEY = "sk-a2cddd46f8924031b2888c97c73c6e43"
-EMBEDDING_URL = "https://dashscope.aliyuncs.com/api/v1/services/embeddings/text-embedding/text-embedding"
-EMBEDDING_MODEL_NAME = "text-embedding-v4"
+EMBEDDING_MODEL_NAME = EMBEDDING_MODEL
 
 
 def get_embedding(text):

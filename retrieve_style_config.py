@@ -1,3 +1,4 @@
+from .model_config import API_KEY, EMBEDDING_URL, EMBEDDING_MODEL
 import os
 import json
 import logging
@@ -15,9 +16,7 @@ def retrieve_style_config(query: str, geometry_type: str = None, inferred_keywor
     使用混合检索策略：向量相似度 + 关键词匹配。
     """
     # 配置
-    API_KEY = "sk-a2cddd46f8924031b2888c97c73c6e43"
-    EMBEDDING_URL = "https://dashscope.aliyuncs.com/api/v1/services/embeddings/text-embedding/text-embedding"
-    EMBEDDING_MODEL_NAME = "text-embedding-v4"
+    EMBEDDING_MODEL_NAME = EMBEDDING_MODEL
     SIMILARITY_THRESHOLD = 0.45  # 向量相似度阈值
 
     # 1. 加载样式库

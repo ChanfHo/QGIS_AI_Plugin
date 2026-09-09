@@ -1,3 +1,4 @@
+from .model_config import API_KEY, BASE_URL, EMBEDDING_URL, VISION_MODEL, EMBEDDING_MODEL
 import os
 import json
 import base64
@@ -6,11 +7,8 @@ import glob
 import time
 
 # Configuration
-API_KEY = "sk-a2cddd46f8924031b2888c97c73c6e43"
-BASE_URL = "https://dashscope.aliyuncs.com/compatible-mode/v1"
-EMBEDDING_URL = "https://dashscope.aliyuncs.com/api/v1/services/embeddings/text-embedding/text-embedding"
-VL_MODEL_NAME = "qwen-vl-max"
-EMBEDDING_MODEL_NAME = "text-embedding-v4"
+VL_MODEL_NAME = VISION_MODEL
+EMBEDDING_MODEL_NAME = EMBEDDING_MODEL
 
 def encode_image(image_path):
     """Encodes an image to base64."""

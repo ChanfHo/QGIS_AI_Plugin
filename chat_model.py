@@ -1,9 +1,9 @@
+from .model_config import API_KEY, BASE_URL, TEXT_MODEL
 from dashscope import Application
 from openai import OpenAI
 from http import HTTPStatus
 import json
 
-API_KEY = "sk-a2cddd46f8924031b2888c97c73c6e43"
 PROMPT1 = "你是一个QGIS智能AI助手，你需要向用户提供有关QGIS的任何帮助，包括QGIS相关咨询和自动化QGIS操作等。"
 PROMPT2 = "你还具有简单的聊天属性，但若用户的问题与GIS无密切关系，只需要进行一段以内的简短回复，并提醒用户最好只询问QGIS操作等有关问题与要求"
 PROMPT3 = "如果用户的问题与GIS相差太远，或违反相关法律法规、守则规范，可以不用回复，并强烈提醒用户不要进行无关的咨询。"
@@ -15,11 +15,11 @@ def chat_with_openai(user_text):
     try:
         client = OpenAI(
             api_key=API_KEY,
-            base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
+            base_url=BASE_URL,
         )
 
         completion = client.chat.completions.create(
-            model="qwen-plus",
+            model=TEXT_MODEL,
             messages=[
                 {'role': 'system', 'content': PROMPT1},
                 {'role': 'system', 'content': PROMPT2},
@@ -34,14 +34,14 @@ def chat_with_openai(user_text):
             return "聊天接口报错: 阿里云 API Key 已欠费或无效，请检查配置。"
         return f"聊天接口报错: {error_str}"
 
-def call_qwen_with_prompt(prompt, model_name="qwen-plus"):
+def call_qwen_with_prompt(prompt, model_name=TEXT_MODEL):
     """
     使用指定的 Prompt 调用 Qwen 模型
     """
     try:
         client = OpenAI(
             api_key=API_KEY,
-            base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
+            base_url=BASE_URL,
         )
 
         completion = client.chat.completions.create(
@@ -97,7 +97,7 @@ def detect_user_intent(user_text):
     try:
         response = Application.call(
             # 若没有配置环境变量，可用百炼API Key将下行替换为：api_key="sk-xxx"。但不建议在生产环境中直接将API Key硬编码到代码中，以减少API Key泄露风险。
-            api_key="sk-a2cddd46f8924031b2888c97c73c6e43",
+            api_key=API_KEY,
             app_id='50881ef244034275adaecf8fad01d17e',  # 替换为实际的应用 ID
             prompt=user_text)
 

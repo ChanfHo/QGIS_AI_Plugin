@@ -1,3 +1,4 @@
+from .model_config import API_KEY, BASE_URL, TEXT_MODEL
 import json
 import logging
 import os
@@ -30,9 +31,8 @@ INITIAL_MESSAGE = ("你好！我是你的QGIS智能制图助手，你可以向�
 os.environ['NO_PROXY'] = 'dashscope.aliyuncs.com'
 
 # ---配置部分---
-API_KEY = "sk-a2cddd46f8924031b2888c97c73c6e43"
-MODEL_TYPE = "qwen-plus"
-MODEL_URL = "https://dashscope.aliyuncs.com/compatible-mode/v1"
+MODEL_TYPE = TEXT_MODEL
+MODEL_URL = BASE_URL
 ROUND_LIMIT = 10
 
 

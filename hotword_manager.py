@@ -1,3 +1,4 @@
+from .model_config import ASR_MODEL
 import dashscope
 from dashscope.audio.asr import VocabularyService
 from qgis.core import QgsProject
@@ -6,7 +7,7 @@ from qgis.core import QgsProject
 class QGISHotwordManager:
     """基于阿里云定制热词文档实现的自动化管理类"""
 
-    def __init__(self, target_model="fun-asr-realtime"):
+    def __init__(self, target_model=ASR_MODEL):
         self.service = VocabularyService()
         self.target_model = target_model
         self.vocab_id = None
