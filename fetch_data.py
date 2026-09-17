@@ -1,10 +1,10 @@
 import os
-import json
 import tempfile
 import requests
-import psycopg2
 
 from typing import Dict, Any
+
+from .database import configure_qgis_uri, connect_database, get_database_config
 
 from qgis._core import QgsRasterLayer
 from qgis.core import Qgis, QgsVectorLayer, QgsProject, QgsMapLayer, QgsDataSourceUri, QgsMessageLog
@@ -64,7 +64,7 @@ def fetch_cloud_shp(sql_query: str, target_name: str) -> str:
     QgsMessageLog.logMessage(f"准备连接数据库, 生成的SQL: {sql_query}", tag=LOG_TAG, level=Qgis.Info)
 
     uri = QgsDataSourceUri()
-    uri.setConnection("39.102.119.130", "5432", "qgis_ai_plugin_db", "postgres", "iamchanfho")
+    configure_qgis_uri(uri)
     
     # 将 SQL 作为子查询作为数据源，必须指定几何列 'geom' 和主键 'gid'
     uri.setDataSource("", f"({sql_query})", "geom", "", "gid")
@@ -91,15 +91,10 @@ def fetch_cloud_raster(sql_query: str, target_name: str, progress_callback=None)
     QgsMessageLog.logMessage(f"开始获取云端栅格数据, 生成的SQL: {sql_query}", tag=LOG_TAG, level=Qgis.Info)
     try:
         # 连接数据库获取文件路径
-        conn = psycopg2.connect(
-            host="39.102.119.130", port="5432", dbname="qgis_ai_plugin_db",
-            user="postgres", password="iamchanfho"
-        )
-        cur = conn.cursor()
-        cur.execute(sql_query)
-        result = cur.fetchone()
-        cur.close()
-        conn.close()
+        with connect_database() as connection:
+            with connection.cursor() as cursor:
+                cursor.execute(sql_query)
+                result = cursor.fetchone()
         
         if not result or not result[0]:
             return "Error: 查询结果为空，未能找到对应的栅格文件路径。"
@@ -108,7 +103,8 @@ def fetch_cloud_raster(sql_query: str, target_name: str, progress_callback=None)
         QgsMessageLog.logMessage(f"获取到栅格路径: {dir_path}", tag=LOG_TAG, level=Qgis.Info)
         
         # 假设服务器上搭建了简单的 HTTP 服务暴露该目录
-        base_url = f"http://39.102.119.130/{dir_path.replace(chr(92), '/').lstrip('/')}"
+        database_host = get_database_config()["host"]
+        base_url = f"http://{database_host}/{dir_path.replace(chr(92), '/').lstrip('/')}"
         
         # 将文件下载到本地临时目录
         temp_dir = tempfile.gettempdir()
@@ -166,7 +162,7 @@ def fetch_cloud_raster(sql_query: str, target_name: str, progress_callback=None)
             QgsMessageLog.logMessage(f"下载完成，准备加载: {local_tif_path}", tag=LOG_TAG, level=Qgis.Info)
             return fetch_local_raster(local_tif_path, target_name)
         else:
-            return f"Error: 无法从云服务器下载文件 (HTTP {resp.status_code})。请确保云服务器 39.102.119.130 已搭建HTTP服务并暴露了该文件路径。"
+            return f"Error: 无法从云服务器下载文件 (HTTP {resp.status_code})。请确保云服务器 {database_host} 已搭建HTTP服务并暴露了该文件路径。"
             
     except Exception as e:
         return f"Error: 云端栅格获取失败 - {str(e)}"

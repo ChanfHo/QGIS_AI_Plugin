@@ -1,6 +1,5 @@
 from .model_config import API_KEY, EMBEDDING_URL, EMBEDDING_MODEL
-import os
-import json
+from .style_knowledge import load_style_library
 import logging
 import requests
 import numpy as np
@@ -19,21 +18,12 @@ def retrieve_style_config(query: str, geometry_type: str = None, inferred_keywor
     EMBEDDING_MODEL_NAME = EMBEDDING_MODEL
     SIMILARITY_THRESHOLD = 0.45  # 向量相似度阈值
 
-    # 1. 加载样式库
-    current_dir = os.path.dirname(os.path.abspath(__file__))
-    library_path = os.path.join(current_dir, "knowledge_base", "style_library.json")
-
-    if not os.path.exists(library_path):
-        logging.warning(f"Style library not found at {library_path}")
-        return None
-
+    # 1. 从远程PostgreSQL加载样式库
     try:
-        with open(library_path, 'r', encoding='utf-8') as f:
-            library = json.load(f)
+        library = load_style_library()
     except Exception as e:
-        logging.error(f"Failed to load style library: {e}")
+        logging.error("Failed to load style library from PostgreSQL: %s", e)
         return None
-
     if not library:
         return None
 
