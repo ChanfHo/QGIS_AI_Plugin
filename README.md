@@ -22,7 +22,7 @@ QGIS AI Mapper 是一个运行在 QGIS 3.x 中的 Python 插件。它把自然�
 | `prompts.py`、`agent_prompts.py` | 任务规划、路由和智能体使用的提示词。 |
 | `knowledge_base/` | 项目知识库及相关检索资源。 |
 | `model/` | 模型或模型调用相关资源。 |
-| `scripts/`、`test/` | 辅助脚本与测试代码。 |
+| `scripts/` | 翻译维护等辅助脚本。 |
 | `metadata.txt` | QGIS 识别插件所需的元数据文件。 |
 
 ## 在 QGIS 中安装
@@ -42,6 +42,8 @@ D:\Master\QGIS_AI_Plugin\qgis_ai_private
 
 插件依赖 QGIS 提供的 PyQGIS、Qt 环境，以及项目代码中使用的 Python 第三方库。模型调用还需要配置可用的模型服务、应用信息和网络环境。首次运行前，请根据本地环境检查 `chat_model.py`、`agents.py` 和相关脚本中的依赖是否已经安装并可访问。
 
+文本任务统一使用`qwen-plus`非思考模式，覆盖规划、路由、四类智能体及总结。`model_config.py`集中设置模型和超时：响应等待上限为90秒，连接超时为10秒，失败请求最多尝试3次。视觉、Embedding和语音模型分别配置，保持原有用途。
+
 ## 工作流概览
 
 用户输入请求后，插件通常按以下顺序处理：
@@ -56,7 +58,7 @@ D:\Master\QGIS_AI_Plugin\qgis_ai_private
 
 - 修改前先确认 QGIS 版本、Python 环境和第三方依赖一致。
 - 修改插件后，在 QGIS 中重新加载插件或重启 QGIS 以验证实际效果。
-- 使用项目中的测试目录和脚本进行针对性检查。
+- 验证时分别检查模型输出、QGIS实际执行结果和错误恢复，不能只以接口返回成功作为整项任务完成的依据。
 - 不要将 API 密钥、应用密钥或其他敏感配置提交到公开仓库。
 
 ## 项目状态

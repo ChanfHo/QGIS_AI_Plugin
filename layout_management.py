@@ -1,3 +1,4 @@
+from .error_handling import failure, execution_boundary, sanitize, ToolResult
 import os
 from typing import Dict, Any
 from qgis.utils import iface
@@ -124,7 +125,8 @@ def get_target_layout(project: QgsProject, layout_name: str = None) -> QgsPrintL
         
     return None
 
-def execute_layout_task(params: Dict[str, Any]) -> str:
+@execution_boundary("agent_d", "LAYOUT_FAILED")
+def execute_layout_task(params: Dict[str, Any]) -> ToolResult:
     """
     Agent E 的具体执行单元。
     """
@@ -137,7 +139,7 @@ def execute_layout_task(params: Dict[str, Any]) -> str:
         if action_type == "zoom_layer":
             layer_name = params.get("layer_name")
             layers = project.mapLayersByName(layer_name)
-            if not layers: return f"Error: 图层 '{layer_name}' 不存在"
+            if not layers: return failure("LAYER_NOT_FOUND", "agent_d", f"Error: 图层 '{layer_name}' 不存在")
             canvas.setExtent(layers[0].extent())
             canvas.refresh()
             return f"已缩放到图层 '{layer_name}'"
@@ -210,9 +212,11 @@ def execute_layout_task(params: Dict[str, Any]) -> str:
 
         # --- 3. 组件添加与导出 ---
         elif action_type in ["add_legend", "add_scale_bar", "add_north_arrow", "add_map", "export_layout_png", "set_title"]:
-            layout = get_target_layout(project, params.get("layout_name"))
+            requested_name = params.get("layout_name")
+            layout = (project.layoutManager().layoutByName(requested_name) if requested_name
+                      else get_target_layout(project))
             if not layout: 
-                return "Error: 没有找到任何可用布局。"
+                return failure("LAYOUT_NOT_FOUND", "agent_d", "Error: 没有找到任何可用布局。")
             layout_name = layout.name()
 
             # --- 设置标题 ---
@@ -261,9 +265,10 @@ def execute_layout_task(params: Dict[str, Any]) -> str:
                     if result == QgsLayoutExporter.Success:
                         return f"成功导出 PNG 至: {file_path}"
                     else:
-                        return f"Error: 导出失败，错误代码 {result}"
+                        code = "EXPORT_PATH_INVALID" if result == QgsLayoutExporter.FileError else "EXPORT_FAILED"
+                        return failure(code, "agent_d", f"导出错误代码{result}", parameters={"file_path": file_path})
                 else:
-                    return "操作已取消 (未选择保存路径)"
+                    return failure("USER_CANCELLED", "agent_d", "操作已取消 (未选择保存路径)")
 
             map_item = None
             for item in layout.items():
@@ -287,6 +292,9 @@ def execute_layout_task(params: Dict[str, Any]) -> str:
                 map_item.zoomToExtent(canvas.extent())
                 layout.addLayoutItem(map_item)
                 return f"已在 '{layout_name}' 补充地图"
+
+            if not map_item and action_type in ("add_legend", "add_scale_bar", "add_north_arrow"):
+                return failure("LAYOUT_ITEM_NOT_FOUND", "agent_d", "目标布局中缺少地图元素")
 
             elif action_type == "add_legend":
                 for item in layout.items():
@@ -316,7 +324,7 @@ def execute_layout_task(params: Dict[str, Any]) -> str:
                         QgsMapLayerLegendUtils.setLegendNodeOrder(node, visible_indices)
                         legend.model().refreshLayerLegend(node)
                 else:
-                    return "已取消添加图例操作"
+                    return failure("USER_CANCELLED", "agent_d", "已取消添加图例操作")
                 
                 layout.addLayoutItem(legend)
                 
@@ -444,11 +452,8 @@ def execute_layout_task(params: Dict[str, Any]) -> str:
                     arrow.attemptMove(QgsLayoutPoint(arrow_x, arrow_y, QgsUnitTypes.LayoutMillimeters))
                 return f"已添加指北针"
 
-        return f"Error: 未知操作 {action_type}"
+        return failure("INVALID_PARAMETER", "agent_d", f"Error: 未知操作 {action_type}")
 
     except Exception as e:
-        import traceback
         err_msg = str(e)
-        full_trace = traceback.format_exc()
-        QgsMessageLog.logMessage(f"Layout Management Error: {err_msg}\n{full_trace}", tag='AI_AGENT_DEBUG', level=Qgis.Critical)
-        return f"Error: {err_msg}"
+        return failure("LAYOUT_FAILED", "agent_d", f"Error: {err_msg}")

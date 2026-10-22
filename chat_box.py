@@ -15,13 +15,16 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtCore import Qt, QTimer, pyqtSignal, QThread, QSize, QRect, QObject
 from PyQt5.QtGui import QFont, QPainter, QPainterPath, QColor, QPixmap, QIcon
 from qgis.utils import iface
-from qgis.core import QgsProject, Qgis
+from qgis.core import QgsMessageLog, QgsProject, Qgis
 
 from .chat_model import chat_with_openai, call_qwen_with_prompt
 from .layout_management import execute_layout_task
 from .hotword_manager import QGISHotwordManager
 from .workflow_graph import create_workflow_graph
-from .prompts import FINAL_SUMMARY_PROMPT, ERROR_REPORT_PROMPT
+from .error_handling import error_from_message, format_user_report, format_technical_report, sanitize, failure
+from .recovery_session import (PENDING_SESSIONS, initialize_session, checkpoint,
+                               save_checkpoint, resume_session)
+from .prompts import FINAL_SUMMARY_PROMPT
 
 INITIAL_MESSAGE = ("你好！我是你的QGIS智能制图助手，你可以向我提出任何关于QGIS的制图任务。例如，你可以对我说：\n"
                    "1.绘制一幅湖北省普通地图；\n"
@@ -365,7 +368,7 @@ class StepProgressWidget(QWidget):
 
     def update_step_status(self, index, status, result_text=None):
         """
-        status: 'running', 'success', 'fail'
+        status: 'running', 'success', 'waiting', 'fail'
         """
         if index < 0 or index >= len(self.steps):
             return
@@ -393,10 +396,18 @@ class StepProgressWidget(QWidget):
                 self.step_progress_bars[index]["widget"].setVisible(False)
         elif status == 'fail':
             self.status_icon.setText("❌")
-            self.status_text.setText(f"共{total_steps}个执行流程，{index}/{total_steps}已完成，步骤{index+1}执行失败")
+            self.status_text.setText(f"共{total_steps}个执行流程，{index}/{total_steps}已完成，步骤{index+1}已终止")
             self.step_labels[index].setStyleSheet("color: #dc3545;")
             self.step_labels[index].setText(f"✘ {index+1}. {task_name} - {result_text}")
             # 失败后隐藏进度条
+            if index < len(self.step_progress_bars):
+                self.step_progress_bars[index]["widget"].setVisible(False)
+        elif status in ('waiting', 'waiting_retry'):
+            self.status_icon.setText("⚠️")
+            waiting_text = "等待重试" if status == 'waiting_retry' else "等待补参"
+            self.status_text.setText(f"共{total_steps}个执行流程，步骤{index+1}{waiting_text}")
+            self.step_labels[index].setStyleSheet("color: #e67700; font-weight: bold;")
+            self.step_labels[index].setText(f"⚠ {index+1}. {task_name} - {result_text}")
             if index < len(self.step_progress_bars):
                 self.step_progress_bars[index]["widget"].setVisible(False)
 
@@ -424,8 +435,14 @@ class StepProgressWidget(QWidget):
 
 # --- 错误展示组件 (嵌入式) ---
 class ErrorWidget(QWidget):
+    resume_requested = pyqtSignal(dict)
+    new_task_requested = pyqtSignal(dict)
+
     def __init__(self, error_report, parent=None):
         super().__init__(parent)
+        self.error_state = error_report if isinstance(error_report, dict) else {}
+        if self.error_state:
+            error_report = format_user_report(self.error_state)
         self.init_ui(error_report)
 
     def init_ui(self, report):
@@ -472,12 +489,32 @@ class ErrorWidget(QWidget):
         self.details_layout.setContentsMargins(10, 10, 10, 10)
         
         self.report_label = QLabel(report)
+        self.report_label.setTextFormat(Qt.PlainText)
         self.report_label.setWordWrap(True)
         self.report_label.setFont(QFont("Microsoft YaHei", 9))
         self.report_label.setStyleSheet("color: #862e9c;") # 深紫色或深红色文字
         self.report_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
         
         self.details_layout.addWidget(self.report_label)
+        if self.error_state:
+            details = QLabel(format_technical_report(self.error_state))
+            details.setTextFormat(Qt.PlainText)
+            details.setWordWrap(True)
+            details.setVisible(False)
+            toggle = QPushButton("展示技术详情和上下文")
+            toggle.clicked.connect(lambda: details.setVisible(details.isHidden()))
+            self.details_layout.addWidget(toggle)
+            self.details_layout.addWidget(details)
+            if self.error_state.get("can_continue"):
+                resume = QPushButton("补充信息后恢复当前步骤／重试")
+                resume.clicked.connect(lambda: self.resume_requested.emit({
+                    "resume_token": self.error_state.get("resume_token"),
+                    "task_id": self.error_state.get("task_id")}))
+                self.details_layout.addWidget(resume)
+            new_task = QPushButton("结束当前任务，开始新任务")
+            new_task.clicked.connect(lambda: self.new_task_requested.emit({
+                "resume_token": self.error_state.get("resume_token")}))
+            self.details_layout.addWidget(new_task)
 
         container_layout.addWidget(self.header_frame)
         container_layout.addWidget(self.details_frame)
@@ -498,7 +535,8 @@ class AgentsWorkgroupThread(QThread):
     init_steps_signal = pyqtSignal(list) # 初始化步骤列表
     update_step_signal = pyqtSignal(int, str, str) # 更新步骤状态 (index, status, result)
     final_response_signal = pyqtSignal(str) # 最终自然语言回复
-    error_report_signal = pyqtSignal(str) # 错误报告弹窗
+    error_report_signal = pyqtSignal(dict) # 传递统一错误实例
+    recovery_state_signal = pyqtSignal(dict)
     
     remove_thinking_signal = pyqtSignal()
     create_msg_bar_signal = pyqtSignal(str)
@@ -512,10 +550,12 @@ class AgentsWorkgroupThread(QThread):
     # 停止信号
     stop_signal = pyqtSignal()
 
-    def __init__(self, user_text, layers, parent=None):
+    def __init__(self, user_text, layers, resume_state=None, parent=None):
         super().__init__(parent)
         self.user_text = user_text
         self.layers = layers
+        self.resume_state = resume_state
+        self.layout_snapshot = [layout.name() for layout in QgsProject.instance().layoutManager().layouts()]
         # 用于接收主线程执行结果的变量
         self.layout_op_result = None
         self._is_stopped = False
@@ -530,9 +570,10 @@ class AgentsWorkgroupThread(QThread):
         """发送下载进度信号"""
         self.download_progress_signal.emit(target_name, percent)
 
-    def execute_layout_op(self, tasks):
+    def execute_layout_op(self, tasks, operation_results=None):
         """执行布局操作（需在主线程运行）"""
         self.layout_op_result = None
+        self.layout_operation_results = operation_results if operation_results is not None else []
         if self._is_stopped: return "任务已停止"
         
         # 发送布局任务信号
@@ -568,24 +609,33 @@ class AgentsWorkgroupThread(QThread):
         except Exception:
             return "任务已完成。"
 
-    def generate_error_report(self, current_step, error_msg):
-        """生成错误报告"""
-        prompt = ERROR_REPORT_PROMPT.format(
-            user_request=self.user_text,
-            current_step=current_step,
-            error_msg=error_msg
+    def generate_error_report(self, error_state):
+        """生成不包含原始异常的用户反馈。"""
+        QgsMessageLog.logMessage(
+            f"[{error_state.get('trace_id')}/{error_state.get('error_id')}] "
+            f"{error_state.get('error_code')}: {sanitize(error_state.get('technical_detail'))}",
+            tag="AI_AGENT_ERROR",
+            level=Qgis.Critical,
         )
-        try:
-            report = call_qwen_with_prompt(prompt)
-            return report
-        except Exception:
-            return f"执行出错：{error_msg}"
+        return error_state
+
+    def save_recovery_state(self, state_update, error_state):
+        """只为可修复错误保存当前步骤断点。"""
+        if not error_state.get("can_continue"):
+            self.recovery_state_signal.emit({})
+            return
+        self.recovery_state_signal.emit(save_checkpoint(state_update))
+
+    @staticmethod
+    def failure_status(error_state):
+        """区分等待补参、等待重试和终止状态。"""
+        if not error_state.get("can_continue"):
+            return "fail"
+        code = error_state.get("error_code", "")
+        return "waiting_retry" if code.startswith("MODEL_") or code in ("NETWORK_FAILED", "INVALID_JSON") else "waiting"
 
     # 运行智能体工作小组
     def run(self):
-        # 创建 Workflow Graph
-        app = create_workflow_graph()
-
         # 初始状态
         inputs = {
             "user_request": self.user_text,
@@ -596,15 +646,30 @@ class AgentsWorkgroupThread(QThread):
             "assigned_agent": "",
             "execution_result": None,
             "error": "",
+            "error_state": {},
+            "resume_mode": False,
+            "recovery_input": "",
             "is_gis_task": True,
             "thought": "",
             "executor": self
         }
+        if self.resume_state:
+            inputs.update(self.resume_state)
+            inputs["layers"] = self.layers
+            inputs["executor"] = self
+            inputs["execution_result"] = None
+            inputs["error"] = ""
+            inputs["resume_mode"] = True
+            inputs["recovery_input"] = self.user_text
+        initialize_session(inputs)
+        inputs["layout_snapshot"] = self.layout_snapshot
 
         current_thought = ""
         task_plan = []
+        latest_state = inputs
 
         try:
+            app = create_workflow_graph()
             # 使用 stream 模式运行
             config = {"recursion_limit": 150}
             for event in app.stream(inputs, config=config):
@@ -614,12 +679,16 @@ class AgentsWorkgroupThread(QThread):
 
                 for node_name, state_update in event.items():
                     if self._is_stopped: return
+                    latest_state = state_update
                     
                     # 错误处理
                     if "error" in state_update and state_update["error"]:
                         err_msg = state_update["error"]
-                        current_step_info = f"步骤 {state_update.get('current_step', 0)+1}"
-                        report = self.generate_error_report(current_step_info, err_msg)
+                        error_state = state_update.get("error_state") or error_from_message(err_msg, node_name)
+                        report = self.generate_error_report(error_state)
+                        self.save_recovery_state(state_update, error_state)
+                        status = self.failure_status(error_state)
+                        self.update_step_signal.emit(state_update.get("current_step", 0), status, error_state["user_title"])
                         self.error_report_signal.emit(report)
                         return 
 
@@ -639,6 +708,10 @@ class AgentsWorkgroupThread(QThread):
                         # 发送计划步骤
                         task_plan = state_update.get("task_plan", [])
                         self.init_steps_signal.emit(task_plan)
+                        if self.resume_state:
+                            completed_count = state_update.get("current_step", 0)
+                            for completed_index in range(completed_count):
+                                self.update_step_signal.emit(completed_index, "success", "断点前已完成")
                         
                         # 记录日志
                         self.execution_log.append(f"任务规划: {len(task_plan)} 个步骤")
@@ -663,12 +736,15 @@ class AgentsWorkgroupThread(QThread):
                             self.execution_log.append(f"步骤 {step_idx+1} 成功: {tool_res}")
                             self.refresh_map_canvas_signal.emit()
                         else:
-                            prob = result.get("possible_problem", "未知错误")
-                            self.update_step_signal.emit(step_idx, "fail", prob)
-                            # 触发错误弹窗
-                            report = self.generate_error_report(f"第 {step_idx+1} 步", prob)
+                            error_state = result.get("error_state") or error_from_message(
+                                result.get("possible_problem", "未知错误"), node_name
+                            )
+                            status = self.failure_status(error_state)
+                            self.update_step_signal.emit(step_idx, status, error_state["user_title"])
+                            report = self.generate_error_report(error_state)
+                            self.save_recovery_state(state_update, error_state)
                             self.error_report_signal.emit(report)
-                            return # 终止
+                            return
                             
             # 流程正常结束
             if not self._is_stopped and task_plan:
@@ -677,7 +753,10 @@ class AgentsWorkgroupThread(QThread):
 
         except Exception as e:
             if not self._is_stopped:
-                report = self.generate_error_report("系统内部错误", str(e))
+                error_state = error_from_message(e, "workflow_runtime")
+                checkpoint(latest_state, error_state)
+                self.save_recovery_state(latest_state, error_state)
+                report = self.generate_error_report(error_state)
                 self.error_report_signal.emit(report)
 
 
@@ -710,6 +789,9 @@ class ChatBox(QObject):
         self.agents_workgroup = None
         self.current_step_widget = None # 当前的步骤组件引用
         self.current_thinking_bubble = None # 当前的思考组件引用
+        self.session_key = id(QgsProject.instance())
+        self.pending_recovery_state = PENDING_SESSIONS.get(self.session_key)
+        QgsProject.instance().cleared.connect(self.clear_recovery_session)
         
         self.setup_connections()
 
@@ -781,9 +863,21 @@ class ChatBox(QObject):
         return self.current_thinking_bubble
 
     def send_message(self):
+        if self.agents_workgroup and self.agents_workgroup.isRunning():
+            return
         user_text = self.user_inputBox.toPlainText().strip()
         if not user_text:
             return
+
+        if user_text.startswith("新任务：") or user_text.startswith("新任务:"):
+            self.clear_recovery_session()
+            user_text = user_text[4:].strip()
+            if not user_text:
+                return
+        resume_state = None
+        if self.pending_recovery_state:
+            resume_state = resume_session(self.pending_recovery_state, user_text,
+                                           self.pending_recovery_state["resume_token"])
 
         self.add_message(user_text, "user")
         self.user_inputBox.clear()
@@ -800,7 +894,7 @@ class ChatBox(QObject):
         self.scroll_to_bottom()
 
         # 启动线程
-        self.agents_workgroup = AgentsWorkgroupThread(user_text, layers)
+        self.agents_workgroup = AgentsWorkgroupThread(user_text, layers, resume_state)
         
         # 绑定新信号
         self.agents_workgroup.thought_signal.connect(self.add_thinking_bubble)
@@ -808,6 +902,7 @@ class ChatBox(QObject):
         self.agents_workgroup.update_step_signal.connect(self.update_step_status)
         self.agents_workgroup.final_response_signal.connect(self.show_final_response)
         self.agents_workgroup.error_report_signal.connect(self.show_error_popup)
+        self.agents_workgroup.recovery_state_signal.connect(self.store_recovery_state)
         
         self.agents_workgroup.message_signal.connect(self.receive_ai_message) # 兼容旧信号
         
@@ -819,6 +914,7 @@ class ChatBox(QObject):
         self.agents_workgroup.start()
 
     def stop_process(self):
+        self.clear_recovery_session()
         if self.agents_workgroup and self.agents_workgroup.isRunning():
             self.agents_workgroup.stop()
             self.stop_button.setEnabled(False)
@@ -837,10 +933,31 @@ class ChatBox(QObject):
 
     def handle_layout_tasks(self, tasks):
         results = []
-        for req in tasks:
+        worker = self.agents_workgroup
+        if not worker or worker._is_stopped:
+            return
+        completed = worker.layout_operation_results
+        if completed and (len(tasks) <= len(completed) or any(
+                tasks[i] != item["request"] for i, item in enumerate(completed))):
+            worker.layout_op_result = failure("INVALID_CONTRACT", "agent_d",
+                                               "恢复计划改变了已完成的布局操作，请仅修改失败请求。")
+            return
+        final_msg = None
+        for index, req in enumerate(tasks):
+            if worker._is_stopped:
+                final_msg = failure("USER_CANCELLED", "agent_d", "用户停止任务")
+                break
+            if index < len(completed):
+                results.append(completed[index]["result"])
+                continue
             res_msg = execute_layout_task(req)
+            if isinstance(res_msg, dict):
+                final_msg = res_msg
+                break
             results.append(res_msg)
-        final_msg = " | ".join(results)
+            completed.append({"request": req, "result": res_msg})
+        if final_msg is None:
+            final_msg = " | ".join(results)
         
         # 布局任务通常是最后一步，我们将结果写回给工作线程，方便后续处理或错误捕获
         if self.agents_workgroup:
@@ -858,11 +975,47 @@ class ChatBox(QObject):
             self.current_step_widget.update_step_status(index, status, result)
 
     def show_final_response(self, text):
+        self.clear_recovery_session()
         self.add_message(text, "ai", typing_effect=True)
+
+    def store_recovery_state(self, state):
+        """保存下一条消息可使用的任务断点。"""
+        if self.agents_workgroup and self.agents_workgroup._is_stopped:
+            return
+        self.pending_recovery_state = state or None
+        if state:
+            PENDING_SESSIONS[self.session_key] = state
+        else:
+            PENDING_SESSIONS.pop(self.session_key, None)
+
+    def clear_recovery_session(self):
+        """只在成功、取消或明确开始新任务时清理断点。"""
+        self.pending_recovery_state = None
+        PENDING_SESSIONS.pop(self.session_key, None)
+
+    def start_new_task(self, request=None):
+        if self.agents_workgroup and self.agents_workgroup.isRunning():
+            return
+        if request and self.pending_recovery_state and request.get("resume_token") != self.pending_recovery_state.get("resume_token"):
+            return
+        self.clear_recovery_session()
+        self.user_inputBox.setFocus()
+
+    def resume_from_card(self, request):
+        """恢复按钮只允许操作当前有效断点。"""
+        state = self.pending_recovery_state
+        if not state or request.get("resume_token") != state.get("resume_token"):
+            self.add_message("该恢复入口已失效，请使用最新错误卡片。", "ai")
+            return
+        if not self.user_inputBox.toPlainText().strip():
+            self.user_inputBox.setPlainText("重试当前步骤")
+        self.send_message()
 
     def add_error_widget(self, report):
         """添加错误报告组件"""
         error_widget = ErrorWidget(report)
+        error_widget.resume_requested.connect(self.resume_from_card)
+        error_widget.new_task_requested.connect(self.start_new_task)
         self.chat_layout.addWidget(error_widget)
         self.scroll_to_bottom()
 

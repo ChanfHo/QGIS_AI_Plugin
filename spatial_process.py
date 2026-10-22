@@ -1,7 +1,8 @@
+from .error_handling import failure, execution_boundary, sanitize, ToolResult
 import logging
 from typing import Dict, Any, List
 from qgis import processing
-from qgis.core import QgsProject, QgsMapLayer, QgsVectorLayer, QgsMessageLog, Qgis
+from qgis.core import QgsProject, QgsMapLayer, QgsVectorLayer, QgsMessageLog, Qgis, QgsApplication, QgsProcessingContext, QgsProcessingParameterDefinition
 from qgis.utils import iface  # 导入 iface 用于地图刷新
 
 
@@ -11,15 +12,21 @@ def get_layer_by_name(layer_name: str) -> QgsMapLayer or None:
     return layers[0] if layers else None
 
 
-def execute_geoprocessing_task(alg_id: str, params: Dict[str, Any]) -> str:
+@execution_boundary("agent_b", "PROCESSING_FAILED")
+def execute_geoprocessing_task(alg_id: str, params: Dict[str, Any]) -> ToolResult:
     """
     执行 QGIS 空间分析算法。这是 Agent B 的核心执行函数。
     :param alg_id: QGIS Processing 算法ID，如 'native:buffer'。
     :param params: LLM 解析出的参数字典，其中的图层名称已经被 run_agent_b 模糊匹配并校正。
                    必须包含 'CUSTOM_LAYER_NAME' 键来命名输出图层。
-    :return: 算法执行结果 (Success: 或 Error:)。
+    :return: 成功摘要或包含error_state的结构化失败结果。
     """
     project = QgsProject.instance()
+    if not isinstance(alg_id, str) or not isinstance(params, dict):
+        return failure("INVALID_PARAMETER", "agent_b", "alg_id必须为文本，params必须为对象")
+    algorithm = QgsApplication.processingRegistry().algorithmById(alg_id)
+    if algorithm is None:
+        return failure("ALGORITHM_NOT_FOUND", "agent_b", "算法未注册", failed_action=alg_id)
     exec_params = params.copy()
 
     # 1. 提取自定义图层名称
@@ -33,7 +40,7 @@ def execute_geoprocessing_task(alg_id: str, params: Dict[str, Any]) -> str:
             layer_obj = get_layer_by_name(v)
             if not layer_obj:
                 # 理论上 run_agent_b 已做模糊匹配，这里是双重保障
-                return f"Error: 找不到名为 '{v}' 的输入图层。"
+                return failure("LAYER_NOT_FOUND", "agent_b", "输入图层不存在", target_layer=v)
             exec_params[k] = layer_obj  # 替换为 QgsMapLayer 对象
 
     # 3. 指定输出目标
@@ -69,6 +76,16 @@ def execute_geoprocessing_task(alg_id: str, params: Dict[str, Any]) -> str:
 
     # 4. 执行算法
     try:
+        missing = [definition.name() for definition in algorithm.parameterDefinitions()
+                   if definition.name() not in exec_params and definition.defaultValue() is None
+                   and not definition.flags() & QgsProcessingParameterDefinition.FlagOptional]
+        if missing:
+            return failure("MISSING_PARAMETER", "agent_b", "缺少算法必需参数", missing_fields=missing)
+        context = QgsProcessingContext()
+        context.setProject(project)
+        valid, reason = algorithm.checkParameterValues(exec_params, context)
+        if not valid:
+            return failure("INVALID_PARAMETER", "agent_b", reason, parameters=params)
         result = processing.run(alg_id, exec_params)
 
         # 6. 处理输出结果
@@ -98,7 +115,7 @@ def execute_geoprocessing_task(alg_id: str, params: Dict[str, Any]) -> str:
 
                 return f"Success: 空间分析 '{alg_id.split(':')[-1]}' 成功执行，已生成新图层 '{target_layer_name}'。"
             else:
-                return f"Error: 算法 '{alg_id}' 执行成功，但无法加载输出图层（格式无效或损坏）。"
+                return failure("LAYER_LOAD_FAILED", "agent_b", f"Error: 算法 '{alg_id}' 执行成功，但无法加载输出图层（格式无效或损坏）。")
 
         else:
             # 处理原地修改的算法 (例如 fieldcalculator, 或统计类算法)
@@ -113,4 +130,4 @@ def execute_geoprocessing_task(alg_id: str, params: Dict[str, Any]) -> str:
             return f"Success: 空间分析 '{alg_id.split(':')[-1]}' 成功执行。"
 
     except Exception as e:
-        return f"Error: 执行 QGIS 算法 '{alg_id}' 失败: {str(e)}"
+        return failure("PROCESSING_FAILED", "agent_b", f"Error: 执行 QGIS 算法 '{alg_id}' 失败: {str(e)}")

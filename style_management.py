@@ -1,3 +1,4 @@
+from .error_handling import failure, execution_boundary, sanitize, ToolResult
 import random
 from typing import Dict, Any
 from PyQt5.QtGui import QColor, QFont
@@ -321,7 +322,7 @@ def create_base_symbol(geometry_type: int, params: Dict[str, Any]) -> QgsSymbol:
 
 
 # --- 注记处理函数 ---
-def apply_annotation_style(layer: QgsVectorLayer, field_name: str, config: Dict[str, Any]) -> str:
+def apply_annotation_style(layer: QgsVectorLayer, field_name: str, config: Dict[str, Any]) -> ToolResult:
     """
     应用注记样式
     :param config: 对应 Schema 中的 'annotation_config' 部分
@@ -329,7 +330,7 @@ def apply_annotation_style(layer: QgsVectorLayer, field_name: str, config: Dict[
     """
     target_field = field_name
     if not target_field:
-        return "Error: No valid field found for annotation."
+        return failure("FIELD_NOT_FOUND", "agent_c", "Error: No valid field found for annotation.")
 
     # 配置字体格式 (QgsTextFormat)
     text_format = QgsTextFormat()
@@ -386,14 +387,20 @@ def apply_annotation_style(layer: QgsVectorLayer, field_name: str, config: Dict[
 
 
 # --- 栅格渲染处理函数 ---
-def apply_raster_style(layer: QgsRasterLayer, config: Dict[str, Any]) -> str:
+def apply_raster_style(layer: QgsRasterLayer, config: Dict[str, Any]) -> ToolResult:
     """
     应用栅格样式逻辑
     :param layer: QgsRasterLayer 对象
     :param config: 对应 Schema 中的 'raster_config' 部分
     """
-    raster_type = config.get("raster_type", "single_band_pseudocolor")
+    raster_type = config.get("raster_type", "pseudocolor")
+    if raster_type == "single_band_pseudocolor":
+        raster_type = "pseudocolor"
     band_no = config.get("band_no", 1)
+    if raster_type not in ("gray", "hillshade", "pseudocolor", "unique"):
+        return failure("STYLE_UNSUPPORTED", "agent_c", "不支持该栅格渲染类型")
+    if not isinstance(band_no, int) or isinstance(band_no, bool) or not 1 <= band_no <= layer.bandCount():
+        return failure("INVALID_PARAMETER", "agent_c", "波段编号不在可用范围内")
     
     # 辅助函数：获取拉伸统计值
     def get_min_max(layer, band):
@@ -485,10 +492,11 @@ def apply_raster_style(layer: QgsRasterLayer, config: Dict[str, Any]) -> str:
         return f"Success: Applied raster style '{raster_type}' to layer."
 
     except Exception as e:
-        return f"Error in raster styling: {str(e)}"
+        return failure("STYLE_FAILED", "agent_c", f"Error in raster styling: {str(e)}")
 
 # 主入口函数
-def set_layer_style(layer_name: str, full_config: Dict[str, Any]) -> str:
+@execution_boundary("agent_c", "STYLE_FAILED")
+def set_layer_style(layer_name: str, full_config: Dict[str, Any]) -> ToolResult:
     """
     主要入口函数
     :param layer_name: 图层名称
@@ -497,12 +505,23 @@ def set_layer_style(layer_name: str, full_config: Dict[str, Any]) -> str:
     project = QgsProject.instance()
     layers = project.mapLayersByName(layer_name)
     if not layers:
-        return f"Error: Layer '{layer_name}' not found."
+        return failure("LAYER_NOT_FOUND", "agent_c", f"Error: Layer '{layer_name}' not found.")
 
     layer = layers[0]
     # 解包配置
     style_type = full_config.get("style_type", "single")
     config = full_config.get("style_config", {})
+    if not isinstance(config, dict):
+        return failure("INVALID_PARAMETER", "agent_c", "style_config必须为对象", target_layer=layer_name)
+    field_name = config.get("target_field_actual")
+    if style_type in ("categorized", "graduated", "annotation"):
+        if not field_name or layer.fields().indexOf(field_name) < 0:
+            return failure("FIELD_NOT_FOUND", "agent_c", "目标字段不存在", target_layer=layer_name,
+                           target_field=field_name or "未指定")
+    if style_type == "graduated":
+        count = config.get("graduated_config", {}).get("classes_count", 5)
+        if not isinstance(count, int) or isinstance(count, bool) or count < 1:
+            return failure("INVALID_PARAMETER", "agent_c", "分级数量必须为正整数", target_layer=layer_name)
     base_params = config.get("symbol_layer_params", {})  # 基础样式参数
 
     # 处理矢量图层样式
@@ -533,13 +552,13 @@ def set_layer_style(layer_name: str, full_config: Dict[str, Any]) -> str:
                     renderer = QgsSingleSymbolRenderer(symbol)
                     layer.setRenderer(renderer)
                 else:
-                    return f"Error: Failed to create symbol for geometry type {geom_type}"
+                    return failure("STYLE_FAILED", "agent_c", f"Error: Failed to create symbol for geometry type {geom_type}")
 
             # 2. Categorized (分类渲染)
             elif style_type == "categorized":
                 field_name = config.get("target_field_actual")  # 注意：这里使用 Agent C 解析后的实际字段名
                 if not field_name:
-                    return "Error: Categorized style requires a valid field (match failed)."
+                    return failure("FIELD_NOT_FOUND", "agent_c", "Error: Categorized style requires a valid field (match failed).")
 
                 cat_config = config.get("categories_config", {})
                 cat_data_list = cat_config.get("categories_data", [])
@@ -551,7 +570,7 @@ def set_layer_style(layer_name: str, full_config: Dict[str, Any]) -> str:
                 # 获取该字段的所有唯一值
                 f_idx = layer.fields().indexOf(field_name)
                 if f_idx == -1:
-                    return f"Error: Field '{field_name}' not found in layer."
+                    return failure("FIELD_NOT_FOUND", "agent_c", f"Error: Field '{field_name}' not found in layer.")
                 unique_values = layer.dataProvider().uniqueValues(f_idx)
 
                 # 为每个唯一值创建符号
@@ -585,7 +604,7 @@ def set_layer_style(layer_name: str, full_config: Dict[str, Any]) -> str:
             elif style_type == "graduated":
                 field_name = config.get("target_field_actual")
                 if not field_name:
-                    return "Error: Graduated style requires a valid field."
+                    return failure("FIELD_NOT_FOUND", "agent_c", "Error: Graduated style requires a valid field.")
 
                 grad_config = config.get("graduated_config", {})
                 method_str = grad_config.get("classification_method", "Quantile")
@@ -647,13 +666,13 @@ def set_layer_style(layer_name: str, full_config: Dict[str, Any]) -> str:
             elif style_type == "annotation":
                 field_name = config.get("target_field_actual")
                 if not field_name:
-                    return "Error: Categorized style requires a valid field (match failed)."
+                    return failure("FIELD_NOT_FOUND", "agent_c", "Error: Categorized style requires a valid field (match failed).")
 
                 anno_config = config.get("annotation_config", {})
                 return apply_annotation_style(layer, field_name, anno_config)
             
             else:
-                return f"Error: Unsupported style type '{style_type}'"
+                return failure("STYLE_UNSUPPORTED", "agent_c", f"Error: Unsupported style type '{style_type}'")
 
             layer.triggerRepaint()
             project.layerTreeRoot().findLayer(layer.id()).setExpanded(True)
@@ -662,7 +681,7 @@ def set_layer_style(layer_name: str, full_config: Dict[str, Any]) -> str:
 
         except Exception as e:
             import traceback
-            return f"Error setting style: {str(e)}\n{traceback.format_exc()}"
+            return failure("STYLE_FAILED", "agent_c", f"Error setting style: {str(e)}\n{traceback.format_exc()}")
 
 
     # 处理栅格图层样式
@@ -673,9 +692,9 @@ def set_layer_style(layer_name: str, full_config: Dict[str, Any]) -> str:
                 return apply_raster_style(layer, raster_config)
             except Exception as e:
                 import traceback
-                return f"Error setting raster style: {str(e)}\n{traceback.format_exc()}"
+                return failure("STYLE_FAILED", "agent_c", f"Error setting raster style: {str(e)}\n{traceback.format_exc()}")
         else:
-            return f"Error: Unsupported style type '{style_type}'"
+            return failure("STYLE_UNSUPPORTED", "agent_c", f"Error: Unsupported style type '{style_type}'")
 
 
 
