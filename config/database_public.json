@@ -1,0 +1,9 @@
+{
+  "host": "39.102.119.130",
+  "port": 5432,
+  "dbname": "qgis_ai_plugin_db",
+  "user": "qgis_ai_public_reader",
+  "password": "EjXXztg0hzjsAxcoZ52_c-1_pHpWcAa0pvlnyAyoyiI",
+  "connect_timeout": 5,
+  "read_only": true
+}

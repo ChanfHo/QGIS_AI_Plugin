@@ -1,0 +1,399 @@
+Example 1: Simple styling requested by the user
+User input: "将湖泊图层，设置为边界为深蓝色，中间为浅蓝色。"
+Available layers: ["湖北省水系", "武汉市湖泊", "武汉市土地利用", "湖北省", "武汉市", "武汉大学", "武汉市自然用地", "洪山区地铁站"]
+Style configuration explanation: The user requests a simple color change. Modify only the color-related values and retain all other defaults. The description implies a polygon lake layer, so fill fill_color and outline_color correctly.
+Output JSON:
+{
+	"layer_name_input": "武汉市湖泊",
+	"style_type": "single",
+	"style_config":{
+		"field_intend": [],
+		"edit_style_config":{},
+		"categories_config":{},
+		"graduated_config":{},
+		"annotation_config":{},
+		"raster_config":{},
+		"symbol_layer_params":{
+			"marker_type": "simple",
+			"name": "circle",
+			"svg_path": "",
+			"size": 3.0,
+			"angle": 0.0,
+			"line_width": 0.6,
+			"line_color": "#000000",
+			"pen_style": "solid",
+			"cap_style": "square",
+			"join_style": "bevel",
+			"fill_color": "#E6FFFF",
+			"fill_style": "solid",
+			"outline_color": "#00FFFF",
+			"outline_width": 0.2,
+			"outline_style": "solid",
+			"additional_layers": []
+		}
+	}
+}
+
+
+
+Example 2: Agent-inferred automatic styling
+User input: "给水系图层设置合适的样式。"
+Available layers: ["湖北省水系", "武汉市湖泊", "武汉市土地利用", "湖北省", "武汉市", "武汉大学", "武汉市自然用地", "洪山区地铁站"]
+Style configuration explanation: The user gives no specific style requirements, so use LLM inference. Water may be a line or polygon layer: fill line_color, fill_color and outline_color, retaining all other defaults. Follow common cartographic conventions for the actual geographic feature.
+Output JSON:
+{
+	"layer_name_input": "湖北省水系",
+	"style_type": "single",
+	"style_config":{
+		"field_intend": [],
+		"edit_style_config":{},
+		"categories_config":{},
+		"graduated_config":{},
+		"annotation_config":{},
+		"raster_config":{},
+		"symbol_layer_params":{
+			"marker_type": "simple",
+			"name": "circle",
+			"svg_path": "",
+			"size": 3.0,
+			"angle": 0.0,
+			"line_width": 0.6,
+			"line_color": "#00FFFF",
+			"pen_style": "solid",
+			"cap_style": "square",
+			"join_style": "bevel",
+			"fill_color": "#E6FFFF",
+			"fill_style": "solid",
+			"outline_color": "#00FFFF",
+			"outline_width": 0.2,
+			"outline_style": "solid",
+			"additional_layers": []
+		}
+	}
+}
+
+
+
+Example 3: Categorized styling with explicit fields and category values
+User input: "将"土地利用"图层根据"用途"字段进行分类，其中住宅区设为黄色，商业区设为红色。"
+Available layers: ["湖北省水系", "武汉市湖泊", "武汉市土地利用", "湖北省", "武汉市", "武汉大学", "武汉市自然用地", "洪山区地铁站"]
+Style configuration explanation: The user specifies styling for each category value. Keep categories_attribute at its default and fill categories_data as requested.
+Output JSON:
+{
+	"layer_name_input": "武汉市土地利用",
+	"style_type": "categorized",
+	"style_config":{
+		"field_intend": ["Type", "Land_use_type", "Land_use_pattern", "Land_use"],
+		"edit_style_config":{},
+		"categories_config":{
+			"categories_attribute": "color",
+			"color_palette": ["#FFFF00", "#FF0000"],
+			"categories_data":[
+				{"value":  "住宅区", 
+				 "symbol_params": { 			
+			 		"marker_type": "simple",
+					"name": "circle",
+					"svg_path": "",
+					"size": 3.0,
+					"angle": 0.0,
+					"line_width": 0.6,
+					"line_color": "#000000",
+					"pen_style": "solid",
+					"cap_style": "square",
+					"join_style": "bevel",
+					"fill_color": "#FFFF00",
+					"fill_style": "solid",
+					"outline_color": "#000000",
+					"outline_width": 0.2,
+					"outline_style": "solid"}
+				},
+				{"value":  "商业区", 
+				 "symbol_params": { 			
+			 		"marker_type": "simple",
+					"name": "circle",
+					"svg_path": "",
+					"size": 3.0,
+					"angle": 0.0,
+					"line_width": 0.6,
+					"line_color": "#000000",
+					"pen_style": "solid",
+					"cap_style": "square",
+					"join_style": "bevel",
+					"fill_color": "#FF0000",
+					"fill_style": "solid",
+					"outline_color": "#000000",
+					"outline_width": 0.2,
+					"outline_style": "solid",
+					"additional_layers": []}
+				}
+			]
+		},
+		"graduated_config":{},
+		"annotation_config":{},
+		"raster_config":{},
+		"symbol_layer_params":{}
+	}
+}
+
+
+
+Example 4: Categorized styling with unspecified fields and category values
+User input: "将武汉市行政区图层按照不同区县进行分类设色。"
+Available layers: ["湖北省水系", "武汉市湖泊", "武汉市土地利用", "湖北省", "武汉市", "武汉大学", "武汉市自然用地", "洪山区地铁站"]
+Style configuration explanation: The user requests categorized styling without an explicit classification field. Infer plausible names in field_intend. categories_config is non-empty; choose the attribute semantically (color here) for backend handling. Leave categories_data empty for the backend. Keep symbol_layer_params at its defaults.
+Output JSON:
+{
+	"layer_name_input": "武汉市",
+	"style_type": "categorized",
+	"style_config":{
+		"field_intend": ["County", "Name", "County_name", "Administrative_region", "District_name"],
+		"edit_style_config":{},
+		"categories_config":{
+			"categories_attribute": "color",
+			"color_palette": [],
+			"categories_data":[]
+		},
+		"graduated_config":{},
+		"annotation_config":{},
+		"raster_config":{},
+		"symbol_layer_params":{
+			"marker_type": "simple",
+			"name": "circle",
+			"svg_path": "",
+			"size": 3.0,
+			"angle": 0.0,
+			"line_width": 0.6,
+			"line_color": "#000000",
+			"pen_style": "solid",
+			"cap_style": "square",
+			"join_style": "bevel",
+			"fill_color": "#CCCCCC",
+			"fill_style": "solid",
+			"outline_color": "#000000",
+			"outline_width": 0.2,
+			"outline_style": "solid",
+			"additional_layers": []
+		}
+	}
+}
+
+
+
+Example 5: Graduated style
+User input: "将湖北省行政区图层按照GDP进行分级渲染"
+Available layers: ["湖北省水系", "武汉市湖泊", "武汉市土地利用", "湖北省", "武汉市", "武汉大学", "武汉市自然用地", "洪山区地铁站"]
+Style configuration explanation: The user requests graduated styling, so fill graduated_config. Unless specified, retain default classification_method, classes_count and symbol_scale_attributem. Color graduation is the default, so infer a start/end color pair. Keep symbol_params at its defaults for backend handling.
+Output JSON:
+{
+	"layer_name_input": "湖北省",
+	"style_type": "graduated",
+	"style_config":{
+		"field_intend": ["GDP"],
+		"edit_style_config":{},
+		"categories_config":{},
+		"graduated_config":{
+			"classification_method": "Quantile",
+			"classes_count": 5,
+			"symbol_scale_attribute": "color",
+			"ramp_colors": ["#FFD6D6", "#FF0000"],
+			"ramp_size": [],
+			"ramp_width": [],
+			"symbol_params":{ 			
+				"marker_type": "simple",
+				"name": "circle",
+				"svg_path": "",
+				"size": 3.0,
+				"angle": 0.0,
+				"line_width": 0.6,
+				"line_color": "#000000",
+				"pen_style": "solid",
+				"cap_style": "square",
+				"join_style": "bevel",
+				"fill_color": "#CCCCCC",
+				"fill_style": "solid",
+				"outline_color": "#000000",
+				"outline_width": 0.2,
+				"outline_style": "solid",
+				"additional_layers": []
+			}
+		},
+		"annotation_config":{},
+		"raster_config":{},
+		"symbol_layer_params":{}
+	}
+}
+
+
+
+Example 6: Complex categorized style
+User input: "将湖北省河流按照河流等级设置不同的粗细，并配置合适的颜色。"
+Available layers: ["湖北省水系", "武汉市湖泊", "武汉市土地利用", "湖北省", "武汉市", "武汉大学", "武汉市自然用地", "洪山区地铁站"]
+Style configuration explanation: The user requests categorized styling, so fill categories_config. Different thicknesses imply categories_attribute width; no explicit values were given, so leave categories_data empty. Suitable colors were requested: keep symbol_layer_params defaults but infer a suitable line color, setting line_color to #00FFFF.
+Output JSON:
+{
+	"layer_name_input": "湖北省河流",
+	"style_type": "categorized",
+	"style_config":{
+		"field_intend": ["Class", "Grade", "Level", "River_class", "River_grade", "River_level"],
+		"edit_style_config":{},
+		"categories_config":{
+			"categories_attribute": "width",
+			"color_palette": [],
+			"categories_data": []
+		},
+		"graduated_config":{},
+		"annotation_config":{},
+		"raster_config":{},
+		"symbol_layer_params":{
+			"marker_type": "simple",
+			"name": "circle",
+			"svg_path": "",
+			"size": 3.0,
+			"angle": 0.0,
+			"line_width": 0.6,
+			"line_color": "#00FFFF",
+			"pen_style": "solid",
+			"cap_style": "square",
+			"join_style": "bevel",
+			"fill_color": "#CCCCCC",
+			"fill_style": "solid",
+			"outline_color": "#000000",
+			"outline_width": 0.2,
+			"outline_style": "solid",
+			"additional_layers": []
+		}
+	}
+}
+
+
+
+Example 7: Annotation request
+User input: "为湖北省各行政区添加注记"
+Available layers: ["湖北省水系", "武汉市湖泊", "武汉市土地利用", "湖北省", "武汉市", "武汉大学", "武汉市自然用地", "洪山区地铁站"]
+Style configuration explanation: The user requests annotations, so fill annotation_config. Infer a polygon layer and select horizontal placement at polygon centers; keep other defaults. Infer field_intend semantically.
+Output JSON:
+{
+	"layer_name_input": "湖北省",
+	"style_type": "annotation",
+	"style_config":{
+		"field_intend": ["City", "Name", "City_name"],
+		"edit_style_config":{},
+		"categories_config":{},
+		"graduated_config":{},
+		"annotation_config":{
+		   	"font_family": "Microsoft YaHei",
+			"font_size": 10.0,
+			"font_color": "#000000",
+			"is_bold": false,
+			"is_italic": false,
+			"draw_buffer": false,
+			"buffer_size": 1.0,
+			"buffer_color": "#FFFFFF",
+			"mode": "horizontal",
+			"offset_xy": [0.0, 0.0]
+		},
+		"raster_config":{},
+		"symbol_layer_params":{}
+	}
+}
+
+
+
+Example 8: Typical modification request
+User input: "把武汉大学图层的颜色搞浅一点点。"
+Available layers: ["湖北省水系", "武汉市湖泊", "武汉市土地利用", "湖北省", "武汉市", "武汉大学", "武汉市自然用地", "洪山区地铁站"]
+Style configuration explanation: The request modifies existing styling, so fill edit_style_config from the user input. For this simple modification, select a single edit_scope semantically.
+Output JSON:
+{
+    "layer_name_input": "武汉大学",
+    "style_type": "single",
+    "style_config": {
+        "field_intend": [],
+        "edit_style_config": {
+            "edit_intent": "lighter",
+            "edit_scope": ["fill_color"],
+            "edit_strength": "slight"
+        },
+        "categories_config": {},
+        "graduated_config": {},
+        "annotation_config": {},
+		"raster_config":{},
+        "symbol_layer_params": {}
+    }
+}
+
+
+
+Example 9: Vague modification request
+User input: "把地铁站图层搞得显眼一点。"
+Available layers: ["湖北省水系", "武汉市湖泊", "武汉市土地利用", "湖北省", "武汉市", "武汉大学", "武汉市自然用地", "洪山区地铁站"]
+Style configuration explanation: The request modifies existing styling, so fill edit_style_config from the user input. For this vague request, infer a point layer and choose fill_color, line_color and size as possible edit_scope attributes.
+Output JSON:
+{
+    "layer_name_input": "洪山区地铁站",
+    "style_type": "single",
+    "style_config": {
+        "field_intend": [],
+        "edit_style_config": {
+            "edit_intent": "more_prominent",
+            "edit_scope": ["fill_color", "outline_color", "size"],
+            "edit_strength": "medium"
+        },
+        "categories_config": {},
+        "graduated_config": {},
+        "annotation_config": {},
+		"raster_config":{},
+        "symbol_layer_params": {}
+    }
+}
+
+
+Example 10: Raster DEM rendering best practice
+User input: "把这个DEM图层渲染得好看一点，要有地形起伏感。"
+Available layers: ["武汉市DEM"] (type: raster)
+Style configuration explanation: The user wants high-quality DEM rendering. Choose pseudocolor; use quantile classification for stronger relief contrast, with invert_ramp=true and RdYlGn so high areas are red.
+Output JSON:
+{
+	"layer_name_input": "武汉市DEM",
+	"style_type": "raster",
+	"style_config":{
+		"field_intend": [],
+		"edit_style_config":{},
+		"categories_config":{},
+		"graduated_config":{},
+		"annotation_config":{},
+        "raster_config": {
+            "raster_type": "pseudocolor",
+            "band_no": 1,
+            "color_ramp_name": "RdYlGn",
+            "invert_ramp": true,
+            "interpolation": "linear",
+            "classification_mode": "quantile",
+            "classes_count": 5
+        },
+        "symbol_layer_params":{}
+	}
+}
+
+
+Example 11: Unique-value land cover raster
+User input: "这个图是土地利用栅格，请按唯一值渲染，不要渐变。"
+Available layers: ["LandCover_Raster"] (type: raster)
+Style configuration explanation: The user explicitly requests unique-value rendering. Choose unique. Select Spectral to distinguish land cover classes. As the data is discrete, set interpolation to exact.
+Output JSON:
+{
+	"layer_name_input": "LandCover_Raster",
+	"style_type": "raster",
+	"style_config":{
+		"field_intend": [],
+		"edit_style_config":{},
+		"categories_config":{},
+		"graduated_config":{},
+		"annotation_config":{},
+		"symbol_layer_params":{},
+        "raster_config": {
+            "raster_type": "unique",
+            "band_no": 1
+        }
+	}
+}

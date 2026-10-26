@@ -1,0 +1,259 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>qgis_aiDockWidgetBase</class>
+ <widget class="QDockWidget" name="qgis_aiDockWidgetBase">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>380</width>
+    <height>700</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>QGIS AI Mapper</string>
+  </property>
+  <widget class="QWidget" name="dockWidgetContents">
+   <layout class="QVBoxLayout" name="verticalLayout">
+    <property name="spacing">
+     <number>0</number>
+    </property>
+    <property name="leftMargin">
+     <number>0</number>
+    </property>
+    <property name="topMargin">
+     <number>0</number>
+    </property>
+    <property name="rightMargin">
+     <number>0</number>
+    </property>
+    <property name="bottomMargin">
+     <number>0</number>
+    </property>
+    <item>
+     <widget class="QScrollArea" name="scrollArea">
+      <property name="widgetResizable">
+       <bool>true</bool>
+      </property>
+      <property name="alignment">
+       <set>Qt::AlignTop</set>
+      </property>
+      <widget class="QWidget" name="scrollAreaWidgetContents">
+       <property name="geometry">
+        <rect>
+         <x>0</x>
+         <y>0</y>
+         <width>380</width>
+         <height>630</height>
+        </rect>
+       </property>
+       <layout class="QVBoxLayout" name="chat_layout_container">
+        <property name="spacing">
+         <number>20</number>
+        </property>
+        <property name="leftMargin">
+         <number>20</number>
+        </property>
+        <property name="topMargin">
+         <number>20</number>
+        </property>
+        <property name="rightMargin">
+         <number>20</number>
+        </property>
+        <property name="bottomMargin">
+         <number>20</number>
+        </property>
+       </layout>
+       <property name="styleSheet">
+       <string notr="true">QWidget#scrollAreaWidgetContents {background:white;}</string>
+       </property>
+      </widget>
+      <property name="styleSheet">
+       <string notr="true">QScrollArea {background:white;border:0;}</string>
+      </property>
+     </widget>
+    </item>
+    <item>
+     <widget class="QWidget" name="bottom_container" native="true">
+      <property name="minimumSize">
+       <size>
+        <width>0</width>
+        <height>70</height>
+       </size>
+      </property>
+      <layout class="QHBoxLayout" name="horizontalLayout">
+       <property name="spacing">
+        <number>12</number>
+       </property>
+       <property name="leftMargin">
+        <number>20</number>
+       </property>
+       <property name="topMargin">
+        <number>15</number>
+       </property>
+       <property name="rightMargin">
+        <number>20</number>
+       </property>
+       <property name="bottomMargin">
+        <number>15</number>
+       </property>
+       <item>
+        <widget class="QFrame" name="input_frame">
+         <property name="frameShape">
+          <enum>QFrame::NoFrame</enum>
+         </property>
+         <property name="frameShadow">
+          <enum>QFrame::Raised</enum>
+         </property>
+         <layout class="QHBoxLayout" name="horizontalLayout_2">
+          <property name="spacing">
+           <number>8</number>
+          </property>
+          <property name="leftMargin">
+           <number>15</number>
+          </property>
+          <property name="topMargin">
+           <number>5</number>
+          </property>
+          <property name="rightMargin">
+           <number>5</number>
+          </property>
+          <property name="bottomMargin">
+           <number>5</number>
+          </property>
+          <item>
+           <widget class="QTextEdit" name="user_inputBox">
+            <property name="sizePolicy">
+             <sizepolicy hsizetype="Expanding" vsizetype="Minimum">
+              <horstretch>0</horstretch>
+              <verstretch>0</verstretch>
+             </sizepolicy>
+            </property>
+            <property name="minimumSize">
+             <size>
+              <width>0</width>
+              <height>36</height>
+             </size>
+            </property>
+            <property name="maximumSize">
+             <size>
+              <width>16777215</width>
+              <height>120</height>
+             </size>
+            </property>
+            <property name="font">
+             <font>
+              <family>Microsoft YaHei</family>
+              <pointsize>10</pointsize>
+             </font>
+            </property>
+            <property name="placeholderText">
+             <string>Message QGIS AI Mapper...</string>
+            </property>
+            <property name="styleSheet">
+             <string notr="true">QTextEdit {background:transparent;border:0;padding:2px;color:#1f2937;}</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QPushButton" name="voice_btn">
+            <property name="minimumSize">
+             <size>
+              <width>32</width>
+              <height>32</height>
+             </size>
+            </property>
+            <property name="maximumSize">
+             <size>
+              <width>32</width>
+              <height>32</height>
+             </size>
+            </property>
+            <property name="cursor">
+             <cursorShape>PointingHandCursor</cursorShape>
+            </property>
+            <property name="toolTip">
+             <string>Voice input</string>
+            </property>
+            <property name="text">
+             <string>🎤</string>
+            </property>
+            <property name="styleSheet">
+             <string notr="true">QPushButton {background:transparent;color:#64748b;border:0;border-radius:10px;padding:0;min-height:0;} QPushButton:hover {background:#cbe5da;color:#1f4d3c;} QPushButton:pressed {background:#a8d6c5;} QPushButton:disabled {background:#eef1ef;color:#a3aba7;} QPushButton:focus {border:1px solid #10a37f;}</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QPushButton" name="stop_button">
+            <property name="minimumSize">
+             <size>
+              <width>32</width>
+              <height>32</height>
+             </size>
+            </property>
+            <property name="maximumSize">
+             <size>
+              <width>32</width>
+              <height>32</height>
+             </size>
+            </property>
+            <property name="cursor">
+             <cursorShape>PointingHandCursor</cursorShape>
+            </property>
+            <property name="toolTip">
+             <string>Stop</string>
+            </property>
+            <property name="text">
+             <string>⏹</string>
+            </property>
+            <property name="visible">
+             <bool>false</bool>
+            </property>
+            <property name="styleSheet">
+             <string notr="true">QPushButton {background:transparent;color:#64748b;border:0;border-radius:10px;padding:0;min-height:0;} QPushButton:hover {background:#cbe5da;color:#1f4d3c;} QPushButton:pressed {background:#a8d6c5;} QPushButton:disabled {background:#eef1ef;color:#a3aba7;} QPushButton:focus {border:1px solid #10a37f;}</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QPushButton" name="send_button">
+            <property name="minimumSize">
+             <size>
+              <width>32</width>
+              <height>32</height>
+             </size>
+            </property>
+            <property name="maximumSize">
+             <size>
+              <width>32</width>
+              <height>32</height>
+             </size>
+            </property>
+            <property name="cursor">
+             <cursorShape>PointingHandCursor</cursorShape>
+            </property>
+            <property name="toolTip">
+             <string>Send</string>
+            </property>
+            <property name="text">
+             <string>↑</string>
+            </property>
+            <property name="styleSheet">
+             <string notr="true">QPushButton {background:#10a37f;color:white;border:0;border-radius:10px;padding:0;min-height:0;} QPushButton:hover {background:#cbe5da;color:#1f4d3c;} QPushButton:pressed {background:#a8d6c5;} QPushButton:disabled {background:#eef1ef;color:#a3aba7;} QPushButton:focus {border:1px solid #10a37f;}</string>
+            </property>
+           </widget>
+          </item>
+         </layout>
+         <property name="styleSheet">
+          <string notr="true">QFrame#input_frame {background:#f5f7f6;border:1px solid #dce5e1;border-radius:14px;}</string>
+         </property>
+        </widget>
+       </item>
+      </layout>
+     </widget>
+    </item>
+   </layout>
+  </widget>
+ </widget>
+ <resources />
+ <connections />
+</ui>

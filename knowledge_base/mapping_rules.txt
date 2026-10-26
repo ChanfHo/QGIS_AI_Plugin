@@ -1,0 +1,33 @@
+General rule:
+- Check current QGIS project layers. If required data already exists, skip its data acquisition and associated data processing steps.
+
+General map rules:
+- Strict order: data acquisition -> data processing -> style configuration -> layout configuration. Never merge different stages, such as acquisition and processing, into one task.
+- Before decomposition, identify whether the requested mapping extent is provincial or city-level. Use exactly the extent specified by the user, never the administrative level above or below it.
+- (1) Data acquisition: one task per source (boundaries, water, DEM, etc.), strictly in the order listed below.
+  - Administrative maps: next-level administrative boundaries, mapping-area administrative boundary, lakes, rivers, then next-level administrative center points.
+  - Topographic maps: mapping-area administrative boundary, DEM, lakes, rivers, then next-level administrative center points.
+- (2) Data processing: one task per layer requiring clipping/processing. Each clipping task must explicitly say "delete the original data". Only vector data such as lakes and rivers needs clipping. Describe it as clipping, not the raster operation "clip by mask".
+- (3) Style configuration: style every layer in its own task. After styling, create a separate annotation task for each layer requiring labels.
+  - Label administrative centers, rivers and lakes.
+  - Important: request only "configure the style of layer XX", such as the DEM layer. Never add any styling suggestions for any layer.
+- (4) Layout configuration: separate tasks for creating the layout (with paper size, orientation and title), adding a scale bar, adding a north arrow and adding a legend.
+  - Infer orientation from the mapping area's shape: landscape for east-west-wide regions such as 湖北, 广西 and 广东; portrait for north-south-long regions such as 江西, 陕西 and 武汉. Default paper size is A4 unless specified. Supply a semantic title. Do not specify a numeric scale; simply request a scale bar, which the system sizes dynamically to the map extent.
+  - The last step must export PNG.
+
+Thematic map rules:
+- Strict order: data acquisition -> style configuration -> layout configuration. Never merge stages, such as acquisition and styling, into one task.
+- Prerequisite: check thematic data. First inspect current project layer names, types and fields for data relevant to the request.
+  - If thematic data or a matching thematic field is absent: do not decompose the task. Output exactly one task containing an error message, such as no GDP thematic data found and a request to load it first (see example 4).
+  - If thematic data exists: consider the thematic design from the request and perform the following stages selectively, in order.
+- (1) Data acquisition: determine whether an administrative basemap is needed.
+  - If the thematic variable is already an attribute of administrative boundaries (e.g. city GDP in an administrative layer), do not fetch administrative boundaries; fetch only next-level administrative center points.
+  - If thematic data is independently distributed (e.g. independent points) and the user requests a distribution map of an area, fetch that area's boundary and its next-level administrative boundaries.
+- (2) Style configuration:
+  - Style basemap data and thematic data in sequence, with one step per layer.
+  - For administrative data separate from thematic data, say only "configure the style of administrative layer XX", without extra instructions.
+  - For a thematic layer or data containing a thematic attribute, choose a suitable renderer from the request or professional judgment and describe it in detail, e.g. graduated GDP with an orange gradient ramp and 5 classes. For graduated rendering, use a gradient of only one color for appearance.
+  - After styling, if the user has special requirements, create a separate annotation task for the thematic layer. Otherwise create a separate annotation task for administrative data.
+- (3) Layout configuration: separate tasks for creating a layout (paper size, orientation and title), adding a scale bar, adding a north arrow and adding a legend.
+  - Infer orientation from the mapping area's shape: landscape for east-west-wide regions such as 湖北, 广西 and 广东; portrait for north-south-long regions such as 江西, 陕西 and 武汉. Default to A4 unless specified and supply a semantic title. Do not specify a numeric scale; request only a scale bar, which the system sizes dynamically to the map extent.
+  - The last step must export PNG.

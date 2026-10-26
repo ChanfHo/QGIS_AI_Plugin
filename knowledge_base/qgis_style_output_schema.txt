@@ -1,0 +1,79 @@
+{
+	"layer_name_input": "<layer name>",
+	"style_type": "single | categorized | graduated | rule | annotation | raster",
+	"style_config":{
+		"field_intend": ["field1", "field2", "field3"],
+		"edit_style_config":{
+		    "edit_intent": "lighter | darker | thicker | thinner | larger | smaller | more_transparent | less_transparent | more_prominent | less_prominent",
+            "edit_scope": ["fill_color", "outline_color", "line_color", "outline_width", "line_width", "size"],
+            "edit_strength": "slight | medium | strong"
+		},
+		"categories_config":{
+			"categories_attribute": "color | size | width",
+			"color_palette": ["#Hex1", "#Hex2"],
+			"categories_data":[
+				{"value":  "category value 1", "symbol_params": {}}
+			]
+		},
+		"graduated_config":{
+			"classification_method": "Quantile | NaturalBreaks | EqualInterval",
+			"classes_count": 5,
+			"symbol_scale_attribute": "color | size | width",
+			"ramp_colors": ["#Hex_Start", "#Hex_End"],
+			"ramp_size": ["float: Size_Start", "float: Size_End"],
+			"ramp_width": ["float: Width_Start", "float: Width_End"],
+			"symbol_params":{}
+		},
+		"annotation_config":{
+		   	"font_family": "Microsoft YaHei | SimHei | Arial | Times New Roman",
+			"font_size": 10.0,
+			"font_color": "#000000",
+			"is_bold": false,
+			"is_italic": false,
+			"draw_buffer": false,
+			"buffer_size": 1.0,
+			"buffer_color": "#FFFFFF",
+			"mode": "free | cartographic | around_point | over_line | curved | horizontal",
+			"offset_xy": [0.0, 0.0]
+		},
+		"raster_config": {
+            "raster_type": "gray | pseudocolor | hillshade | unique",
+            "band_no": 1,
+            "color_ramp_name": "Spectral | RdYlGn | RdBu | Greys | Viridis | Magma | Plasma | Inferno | Blues | Greens | Reds | YlOrBr | BrBG | PiYG | PRGn | PuOr | RdGy | RdYlBu | YlGn | YlGnBu | Oranges | Purples | GnBu | BuPu | BuGn | YlOrRd | PuBu | PuBuGn | PuRd | RdPu ",
+            "invert_ramp": false,
+            "interpolation": "linear | discrete | exact",
+            "classification_mode": "continuous | equal_interval | quantile",
+            "classes_count": 5,
+            "hillshade_z_factor": 1.0,
+            "hillshade_azimuth": 315.0,
+            "hillshade_altitude": 45.0
+        },
+		"symbol_layer_params":{
+			"marker_type": "simple | svg | font",
+			"name": "circle | square | triangle | star | cross",
+			"svg_path": "",
+			"size": 3.0,
+			"angle": 0.0,
+			"line_width": 0.6,
+			"line_color": "#000000",
+			"pen_style": "solid | dash | dot | dash dot | dash dot dot | dash dash dot",
+			"cap_style": "square | round | flat",
+			"join_style": "bevel | miter | round",
+			"fill_color": "#CCCCCC",
+			"fill_style": "solid | no | cross | dense1",
+			"outline_color": "#000000",
+			"outline_width": 0.2,
+			"outline_style": "solid | dash | dot | dash dot | dash dot dot | dash dash dot",
+			"additional_layers": [
+				{
+					"marker_type": "simple | svg | font",
+					"name": "circle | square | triangle | star | cross",
+					"size": 1.5,
+					"fill_color": "#FFFFFF",
+					"outline_color": "#000000",
+					"outline_width": 0.2
+				}
+			]
+		}
+	}
+}

@@ -1,0 +1,19 @@
+[general]
+name=QGIS-AI-Mapper
+qgisMinimumVersion=3.36
+description=Natural-language GIS analysis, styling and map layout in QGIS
+version=1.0.0
+author=ChanfHo
+email=1216072419@qq.com
+about=Describe a GIS task in Chinese or English to load data, run spatial processing, style layers and export map layouts. Requires QGIS with Qt5, Python dependencies and a personal Qwen API Key. Includes public read-only sample data access.
+repository=https://github.com/ChanfHo/QGIS_AI_Plugin
+homepage=https://github.com/ChanfHo/QGIS_AI_Plugin
+tracker=https://github.com/ChanfHo/QGIS_AI_Plugin/issues
+category=Plugins
+tags=AI,mapping,cartography,Qwen,LangGraph
+icon=assets/icon.png
+experimental=False
+deprecated=False
+hasProcessingProvider=no
+server=False
+changelog=1.0.0: First public release with Chinese/English interaction, personal API Key configuration, GIS processing, styling, layout export and public read-only data access.

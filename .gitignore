@@ -1,0 +1,31 @@
+# Python
+__pycache__/
+*.py[cod]
+
+# Runtime artifacts
+*.log
+*.tmp
+*.bak
+.env
+.env.*
+*.dpapi
+database.private.json
+database_private.json
+database.local.*
+.pgpass
+pgpass.conf
+*.zip
+releases/
+
+# Local development
+.idea/
+.vscode/
+.trae/
+
+# System
+.DS_Store
+Thumbs.db
+
+# Qt
+*.o
+*.so

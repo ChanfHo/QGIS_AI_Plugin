@@ -1,0 +1,60 @@
+Parameter,Structure_Level,Default_Value,Value_Options,Description,Status
+layer_name_input,1,matched layer name,,Target layer name,Required
+style_type,1,"""single""","""single | categorized | graduated | rule | annotation | raster""",Renderer type,Required
+style_config,1,,,Style parameter configuration,Required
+field_intent,2,[],,"Fuzzy field intent list for categorization, graduation or labels","Required for style_type categorized/graduated/annotation. Infer plausible field names from the request, in English, case-insensitively."
+edit_style_config,2,{},,Existing style modification parameters,Fill when the user requests modification of the current layer style
+edit_intent,3,"""lighter""","""lighter | darker | thicker | thinner | larger | smaller | more_transparent | less_transparent | more_prominent | less_prominent""",Core modification intent,Required when edit_style_config is needed
+edit_scope,3,[],"[""fill_color"", ""outline_color"", ""line_color"", ""outline_width"", ""line_width"", ""size""]",Modification targets,Required when edit_style_config is needed; select one or more of the provided options only
+edit_strength,3,"""medium""","""slight | medium | strong""",Modification strength,Required when edit_style_config is needed
+categories_config,2,{},,Categorized renderer parameters,Fill when style_type is categorized
+categories_attribute,3,"""color""","""color | size | width""",Categorized style attribute,Required when categories_config is needed
+color_palette,3,[],,Category color list,Fill when categories_attribute is color and the user supplied colors
+categories_data,3,[],,Values and styles for each category,Required when categories_config is needed and the user explicitly supplied categories; symbol_params has the full symbol_layer_params structure
+graduated_config,2,{},,Graduated renderer parameters,Fill when style_type is graduated
+classification_method,3,"""Quantile""","""Quantile | NaturalBreaks | EqualInterval""",Classification method,Required when graduated_config is needed
+class_count,3,5,,Number of classes,Required when graduated_config is needed
+symbol_scale_attribute,3,"""color""","""color | size | width""",Graduated style attribute,Required when graduated_config is needed
+ramp_colors,3,[],,Start and end gradient colors,Fill when symbol_scale_attribute is color
+ramp_size,3,[],,Start and end gradient sizes,Fill when symbol_scale_attribute is size
+ramp_width,3,[],,Start and end gradient widths,Fill when symbol_scale_attribute is width
+symbol_params,3,{},,Graduated symbol parameters,Full symbol_layer_params structure; required when graduated_config is needed
+annotation_config,2,{},,Annotation parameters,Fill when style_type is annotation
+font_family,3,"""Microsoft YaHei""","""Microsoft YaHei | SimHei | Arial | Times New Roman""",Font family,Required when annotation_config is needed
+font_size,3,10,,Font size,Required when annotation_config is needed
+font_color,3,"""#000000""",,Font color,Required when annotation_config is needed
+is_bold,3,0,,Whether text is bold,Required when annotation_config is needed
+is_italic,3,0,,Whether text is italic,Required when annotation_config is needed
+draw_buffer,3,0,,Whether to draw a text buffer,Required when annotation_config is needed
+buffer_size,3,1,,Buffer width,Required when annotation_config is needed
+buffer_color,3,"""#FFFFFF""",,Buffer color,Required when annotation_config is needed
+mode,3,"""free""","""free | cartographic | around_point | over_line | curved | horizontal""",Label placement mode,Required when annotation_config is needed; infer layer type from the requested name and select a suitable mode semantically
+offset_xy,3,"[0.0, 0.0]",,Label offsets in X and Y,Required when annotation_config is needed
+raster_config,2,{},,Raster layer style parameters,Fill when style_type is raster
+raster_type,3,"""pseudocolor""","""gray | pseudocolor | hillshade | unique""",Raster renderer type,Required when raster_config is needed
+band_no,3,1,,Rendering band number,Required when raster_config is needed
+color_ramp_name,3,"""RdYlGn""","""Spectral | RdYlGn | RdBu | Greys | Viridis | Magma | Plasma | Inferno | Blues | Greens | Reds | YlOrBr | BrBG | PiYG | PRGn | PuOr | RdGy | RdYlBu | YlGn | YlGnBu | Oranges | Purples | GnBu | BuPu | BuGn | YlOrRd | PuBu | PuBuGn | PuRd | RdPu """,Standard QGIS color ramp name,Fill when raster_type is pseudocolor; select the closest provided option to the user's intent
+invert_ramp,3,0,,Whether to invert the color ramp,Fill when raster_type is pseudocolor
+interpolation,3,"""linear""","""linear | discrete | exact""",Interpolation method,Fill when raster_type is pseudocolor
+classification_mode,3,"""quantile""","""continuous | equal_interval | quantile""",Classification mode,Fill when raster_type is pseudocolor
+classes_count,3,5,,Number of classes,Fill when raster_type is pseudocolor
+hillshade_z_factor,3,1,,Vertical exaggeration factor,Fill when raster_type is hillshade
+hillshade_azimuth,3,315,0-360,Light source azimuth,Fill when raster_type is hillshade
+hillshade_altitude,3,45,0-90,Light source altitude,Fill when raster_type is hillshade
+symbol_layer_params,2,{},,General symbol settings,"Fill only when edit_style_config, categories_data, graduated_config, annotation_config and raster_config are all empty; otherwise leave strictly empty"
+marker_type,3,"""simple""","""simple | svg | font""",Point marker type,Required in every symbol_layer_params structure
+name,3,"""circle""","""circle | square | triangle | star | cross""",Simple marker shape,Required when marker_type is simple; default circle
+svg_path,3,"""""",,SVG symbol image path,Required when marker_type is svg
+size,3,3,,Marker size (numeric),Required in every symbol_layer_params structure
+angle,3,0,,Marker rotation angle (numeric),Required in every symbol_layer_params structure
+line_width,3,0.6,,Line width (numeric),Required in every symbol_layer_params structure
+line_color,3,"""#000000""",,Main line color,Required in every symbol_layer_params structure
+pen_style,3,"""solid""","""solid | dash | dot | dash dot""",Line style,Required in every symbol_layer_params structure
+cap_style,3,"""square""","""square | round | flat""",Cap style,Required in every symbol_layer_params structure
+join_style,3,"""bevel""","""bevel | miter | round""",Join style,Required in every symbol_layer_params structure
+fill_color,3,"""#CCCCCC""",,Polygon/point fill color,Required in every symbol_layer_params structure
+fill_style,3,"""solid""","""solid | no | cross | dense1""",Polygon fill style,Required in every symbol_layer_params structure
+outline_color,3,"""#000000""",,Outline color,Required in every symbol_layer_params structure
+outline_width,3,0.2,,Outline width (numeric),Required in every symbol_layer_params structure
+outline_style,3,"""solid""","""solid | dash""",Outline style,Required in every symbol_layer_params structure
+additional_layers,3,[],,Additional symbol layers,Optional

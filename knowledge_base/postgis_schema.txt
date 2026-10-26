@@ -1,0 +1,66 @@
+The qgis_ai_plugin_db database contains the following tables. Use this structure to generate SQL for cloud/database spatial data requests.
+All spatial geometry columns are named `geom`.
+
+1. Table: `china_province` (provincial administrative boundaries, stored as polygons)
+   - `gid` (serial): primary key
+   - `province` (text): province name (e.g. '湖北省', '北京市')
+   - `code` (text): administrative code
+   - `geom` (geometry): spatial geometry
+
+2. Table: `china_city` (city administrative boundaries, stored as polygons)
+   - `gid` (serial): primary key
+   - `province` (text): province name
+   - `city` (text): city name (e.g. '武汉市', '深圳市')
+   - `code` (text): administrative code
+   - `geom` (geometry): spatial geometry
+
+3. Table: `china_county` (county/district administrative boundaries, stored as polygons)
+   - `gid` (serial): primary key
+   - `province` (text): province name
+   - `city` (text): city name
+   - `county` (text): county/district name (e.g. '武昌区', '南山区')
+   - `code` (text): administrative code
+   - `geom` (geometry): spatial geometry
+
+4. Table: `water_line` (linear water features)
+  - `gid` (serial): primary key
+  - `name` (text): water feature name
+  - `level` (text): water feature level
+  - `length_km` (double): water feature length
+  - `province` (text[]): list of traversed province names
+  - `adcode` (text[]): list of traversed province codes
+  - `geom` (geometry): spatial geometry
+
+5. Table: `water_polygon` (polygon water features)
+  - `gid` (serial): primary key
+  - `name` (text): water feature name
+  - `level` (text): water feature level
+  - `area_km2` (double): water feature area
+  - `province` (text[]): list of traversed province names
+  - `adcode` (text[]): list of traversed province codes
+  - `geom` (geometry): spatial geometry
+
+6. Table: `highway` (expressways)
+  - `gid` (serial): primary key
+  - `name` (text): expressway name
+  - `code` (text): expressway code
+  - `length_km` (double): expressway length
+  - `province` (text[]): list of traversed province names
+  - `adcode` (text[]): list of traversed province codes
+  - `geom` (geometry): spatial geometry
+
+7. Table: `china_dem_index` (provincial DEM storage path index)
+  - `id` (serial): primary key
+  - `province` (text): province name
+  - `adcode` (text): province code
+  - `dir_path` (text): DEM file storage path
+
+8. Table: `china_admin_center` (nationwide city/county administrative centers, stored as points)
+  - `gid` (serial): primary key
+  - `name` (text): name
+  - `adcode` (text): administrative code
+  - `level` (text): administrative level with four data values: “直辖市”, “省级行政中心”, “设区市行政中心”, “县（区、市）行政中心”; “省级行政中心” denotes the administrative center of the provincial capital
+  - `province` (text): parent province name
+  - `city` (text): parent city name
+  - `geom` (geometry): spatial geometry
+(New table structures will be listed here when added. Query only the known tables above.)
